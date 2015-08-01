@@ -1,0 +1,9 @@
+mysql-client
+mysql-server
+php5-mysql
+
+phpmyadmin
+##change owner
+post-cmd:chown -R www-data:www-data /usr/share/phpmyadmin
+#post-cmd:chmod -R 775 /usr/share/phpmyadmin/config
+

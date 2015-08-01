@@ -1,0 +1,31 @@
+#install some helpers to exclude brute force attacks
+#http://www.atwillys.de/content/linux/blocking-countries-using-geoip-and-iptables-on-ubuntu/
+#
+
+#linux sources are needed for xtables-addons-dkms
+#which are generated if not present
+linux-source
+
+#pearl
+libtext-csv-xs-perl
+
+#geolite geoip database
+geoip-database
+
+#iptables modules for geoip
+xtables-addons-dkms
+
+#commands for updating are in .../files/usr/share/xt_geoip
+#cron.d will update geo database
+#iptables -I INPUT 1 -s 192.168.0.0/24 -j ACCEPT
+#iptables -I INPUT 2 -m state --state NEW -m geoip ! --source-country DE,GB,FR -j DROP
+
+#change owner/mode
+post-cmd:adduser --disabled-login --disabled-password --system --group --no-create-home geoip
+post-cmd:chmod 755 /usr/share/xt_geoip/update.sh
+post-cmd:chmod 755 /usr/share/xt_geoip/xt_geoip_build.pl
+post-cmd:chown -R geoip:geoip /usr/share/xt_geoip
+
+#run update as user geoip 
+post-cmd:su geoip -mc '/usr/share/xt_geoip/update.sh'
+

@@ -1,0 +1,7 @@
+
+
+#compile and install all host tools
+
+post-cmd:chmod 755 /root/freifunk/vserver-freifunk/compiled-tools/build.sh
+post-cmd:/root/freifunk/vserver-freifunk/compiled-tools/build.sh
+

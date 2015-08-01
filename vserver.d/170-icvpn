@@ -1,0 +1,6 @@
+#installs quagga / bgp(stadtverbindungen über tincd)
+quagga
+post-cmd:chmod 640 /etc/quagga/zebra.conf
+post-cmd:chmod 640 /etc/quagga/bgpd.conf
+post-cmd:chown -R quagga:quagga /etc/quagga/*
+

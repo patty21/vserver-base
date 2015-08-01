@@ -1,0 +1,23 @@
+
+# freifunk vserver beispiel: resolv.conf wird durch resolvconf automatisch
+# gesetzt. das bekommt die infos von ppp,dhclient,dnsmasq,ifup (siehe manpage)
+# wenn dieses file hier nicht vom vserver anbieter statisch gesetzt ist (also
+# dhcp verwendet wird), so sollte dass auf statisch gesetzt werden. bei
+# netcup scheint es mit dhcp probleme zu geben und der vserver ist nach tagen/wochen
+# einfach nicht mehr erreichbar
+
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto eth0
+iface eth0 inet static
+        address 37.120.169.24
+        netmask 255.255.252.0
+        broadcast 37.120.171.255
+        gateway 37.120.168.1
+	dns-nameservers 46.38.225.230 46.38.252.230

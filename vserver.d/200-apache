@@ -1,0 +1,58 @@
+apache2-utils
+libapache2-mod-proxy-html
+libapache2-mod-vhost-hash-alias
+libapr1
+libsqlite3-0
+apache2-mpm-prefork
+libapache2-mod-fcgid
+libapache2-mod-auth-plain
+apache2.2-common
+libapache2-mod-auth-pam
+libgeoip1
+libpq4
+libmhash2
+libapache2-mod-php5
+libaprutil1
+libapache2-mod-geoip
+
+pre-cmd:a2enmod cgi
+pre-cmd:a2enmod ssl
+pre-cmd:a2enmod proxy 
+pre-cmd:a2enmod proxy_http
+
+#modules for changing links of html
+pre-cmd:a2enmod rewrite 
+pre-cmd:a2enmod deflate 
+pre-cmd:a2enmod proxy_html 
+pre-cmd:a2enmod xml2enc
+
+#modules for changing html header (send and response)
+pre-cmd:a2enmod headers 
+
+#webdav support
+#pre-cmd:a2enmod dav
+#pre-cmd:a2enmod dav_fs
+#post-cmd:chown -R www-data:www-data /var/webdav
+#post-cmd:chmod -R 775 /var/webdav
+#post-cmd:echo "Enter webdav (https://webdav.ddmesh.de/) password:"
+#post-cmd:htpasswd -c /etc/apache2/basic-password stephan
+
+#remove all default pages
+pre-cmd:rm -rf /etc/apache2/sites-enabled/*
+pre-cmd:rm -rf /etc/apache2/ssl
+#pre-cmd:rm -rf /var/www/*
+
+#create ssl key and self-signed certificate if not present
+#post-cmd:cd /etc/apache2/ssl
+#post-cmd:echo creating server.key without encryption -des3:
+#post-cmd:openssl genrsa -out server.key 1024
+#post-cmd:chmod 400 server.key
+#post-cmd:echo creating server.crt:
+#post-cmd:openssl req -new -x509 -nodes -sha1 -days 3650 -key server.key -out server.crt
+
+#change all www dirs to correct owner and rights
+post-cmd:chown -R www-data:www-data /var/www_*
+post-cmd:chmod -R 775 /var/www_*
+
+post-cmd:/etc/init.d/apache2 restart
+

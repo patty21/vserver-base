@@ -1,0 +1,4 @@
+#tool to measure network speed. openwrt tool is ttcp using port 5010
+#start nuttcp on vserver with: nuttcp -i -p 5010
+nuttcp
+

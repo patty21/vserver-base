@@ -1,0 +1,8 @@
+
+#overwrite less editor
+post-cmd:ln -sf /usr/bin/vi /usr/bin/nano
+post-cmd:ln -sf /usr/bin/vi /usr/bin/editor
+
+#overwrite any possible change of default shell, to avoid problems with own scripts
+post-cmd:ln -sf /bin/bash /bin/sh
+

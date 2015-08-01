@@ -1,0 +1,203 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          S41firewall
+# Required-Start:    S40network
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: set freifunk firewall
+# Description:       set freifunk firewall
+### END INIT INFO
+
+BACKBONE_DEV=tbb+
+WAN_DEV=$(nvram get ifname)
+
+eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
+
+
+if [ "$1" = "start" ]; then
+
+   	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+    iptables -N T_BACKBONE_I
+
+    iptables -N T_BACKBONE_O
+    iptables -A OUTPUT -j T_BACKBONE_O
+
+#----- setup NAT rules -----
+	echo "setting up SNAT/MASQUERADE rules ..."
+
+	#dont SNAT locally generated packets target for local
+	iptables -t nat -A POSTROUTING -o lo -j ACCEPT
+
+	#SNAT all traffic to backbone (set source=node-ip)
+	#DON'T SNAT OGMs
+	iptables -t nat -A POSTROUTING -o $BACKBONE_DEV -p udp --dport 4305:4307 -j ACCEPT
+	iptables -t nat -A POSTROUTING -o $BACKBONE_DEV  -s $_ddmesh_nonprimary_ip -j SNAT --to-source $_ddmesh_ip
+
+	#masq to icvpn 
+#	iptables -t nat -A POSTROUTING -o icvpn -j SNAT --to-source 10.207.0.19
+
+	#if I send packets from this vserver over icvpn, ip 10.207.0.19 is used. This ip is not in routing tables
+	#of the foreign routers.
+	#IMPORTANT DON'T SNAT zebra/bgp packets, else the return address is changed and no route is known to 10.200.0.1
+	#until the quagga has setup the routes (which is not possible if these packets do not come back because of invalid source ip)
+#X#	iptables -t nat -A POSTROUTING -s 10.207.0.19 -p tcp --dport 179 -j ACCEPT 
+#X#	iptables -t nat -A POSTROUTING -s 10.207.0.19 -p udp --dport 179 -j ACCEPT 
+	#it could be possible that ip 10.200.0.1 is not known at bgp-server and will be added later to the routing table or not.
+	#To allow direct bgp-server access, dont change source ip of the packets that are going directly to the icvpn server
+#X#	iptables -t nat -A POSTROUTING -d 10.207.0.0/16 -j ACCEPT
+	#all other packets are comming from "this node" not from this icvpn server
+#X#	iptables -t nat -A POSTROUTING -s 10.207.0.19 -j SNAT --to-source $_ddmesh_ip
+
+	#masquerade all to vpn tunnel
+	iptables -t nat -A POSTROUTING -o vpn+ -j MASQUERADE
+
+#----- setup INPUT rules -----
+	echo "setting up INPUT rules ..."
+
+	#accept answers
+	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	
+    	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+    	iptables -A INPUT -j T_BACKBONE_I
+	
+	#allow access only some services 
+	iptables -A INPUT -p icmp -j ACCEPT
+	#tracepath/route
+	iptables -A INPUT -p udp --dport 30000:50000 -j ACCEPT
+	iptables -A INPUT -i lo -j ACCEPT
+	iptables -A INPUT -p TCP --dport 80 -j ACCEPT
+	iptables -A INPUT -p TCP --dport 443 -j ACCEPT
+#	iptables -A INPUT -p TCP --dport 22 -j ACCEPT
+	#iptables -A INPUT -d 224.0.0.0/4 -j ACCEPT
+
+	#time service (inetd) for rdate (SNTP)
+#X#	iptables -A INPUT -p TCP --dport 37 -j ACCEPT
+#X#	iptables -A INPUT -p udp --dport 37 -j ACCEPT
+
+	#time service ntp for common NTP clients (NTP is not SNTP)
+#X#	iptables -A INPUT -p TCP --dport 123 -j ACCEPT
+#X#	iptables -A INPUT -p udp --dport 123 -j ACCEPT
+
+ 	#smtp for incomming emails (from other mail server or from email clients)
+	#SMTP - port 25
+	iptables -A INPUT -p tcp --dport 25 -j ACCEPT
+	#IMAP - port 143
+	iptables -A INPUT -p tcp --dport 143 -j ACCEPT
+
+	iptables -A INPUT -i bmx_prime -j ACCEPT
+
+	#--- input backbone ----------
+	#bmx
+	iptables -A INPUT -p udp -i $BACKBONE_DEV --dport 4305 -j ACCEPT
+	iptables -A INPUT -p udp -i $BACKBONE_DEV --dport 4306 -j ACCEPT
+	iptables -A INPUT -p udp -i $BACKBONE_DEV --dport 4307 -j ACCEPT
+	iptables -A INPUT -p udp -i lo --dport 4305 -j ACCEPT
+	iptables -A INPUT -p udp -i lo --dport 4306 -j ACCEPT
+	iptables -A INPUT -p udp -i lo --dport 4307 -j ACCEPT
+
+        #nuttcp
+        iptables -A INPUT -i $BACKBONE_DEV -d $_ddmesh_ip -p tcp --dport 5010 -j ACCEPT
+        iptables -A INPUT -i $BACKBONE_DEV -d $_ddmesh_ip -p tcp --dport 5011 -j ACCEPT
+        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5010 -j ACCEPT
+        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5011 -j ACCEPT
+
+	#dns
+	iptables -A INPUT -i $BACKBONE_DEV -p TCP --dport 53 -j ACCEPT
+	iptables -A INPUT -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
+
+	#ssh
+	iptables -A INPUT -i $BACKBONE_DEV -p TCP --dport 22 -j ACCEPT
+
+	#http
+	iptables -A INPUT -i $BACKBONE_DEV -p TCP --dport 80 -j ACCEPT
+	iptables -A INPUT -i icvpn -p tcp --dport 80 -j ACCEPT
+
+	#---- input icvpn ------------
+
+	#allow icvpn (bgpd)
+#X#	iptables -A INPUT -i icvpn -p tcp --dport 179 -j ACCEPT
+#X#	iptables -A INPUT -i icvpn -p udp --dport 179 -j ACCEPT
+	
+
+	#---- input eth0 --------------
+
+	#vtun backbone
+	iptables -A INPUT -i $WAN_DEV -p tcp --dport 5000 -j ACCEPT
+	iptables -A INPUT -i $WAN_DEV -p udp --dport 5000 -j ACCEPT
+	
+#some portforwarding
+#iptables -t nat -I PREROUTING -p tcp --dport 81 -j DNAT --to-destination 37.120.169.24:5000
+
+	#icvpn tunnel
+#X#	iptables -A INPUT -i $WAN_DEV -p tcp --dport 656 -j ACCEPT
+#X#	iptables -A INPUT -i $WAN_DEV -p udp --dport 656 -j ACCEPT
+
+	#drop packages before logging
+	iptables -A INPUT -i $WAN_DEV -p udp --dport 137 -j DROP
+
+	iptables -A INPUT -j LOG --log-prefix "DROP IPv4 INPUT: "
+	iptables -A INPUT -j DROP
+
+#----- setup FORWARD rules -----
+	echo "setting up FORWARD rules ..."
+
+	iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+	iptables -A FORWARD -i $BACKBONE_DEV -o $BACKBONE_DEV -j ACCEPT
+	iptables -A FORWARD -i $BACKBONE_DEV -o bmx+ -j ACCEPT
+	iptables -A FORWARD -i bmx+ -o bmx+ -j ACCEPT	
+
+	#allow forward freifunk and internet to icvpn
+#X#	iptables -A FORWARD -i icvpn -s 10.200.0.0/15 -j DROP 
+#X#	iptables -A FORWARD -i bat+ -o icvpn -j ACCEPT	
+#X#	iptables -A FORWARD -i bmx+ -o icvpn -j ACCEPT	
+
+#X#	iptables -A FORWARD -i $BACKBONE_DEV -o icvpn -j ACCEPT
+#X#	iptables -A FORWARD -i icvpn -o $BACKBONE_DEV -d 10.200.0.0/15 -j ACCEPT
+#X#	iptables -A FORWARD -i icvpn -o bmx+ -d 10.200.0.0/15 -j ACCEPT
+
+	#allow forward to openvpn tunnel 
+	iptables -A FORWARD -i $BACKBONE_DEV -o vpn+ -j ACCEPT
+	iptables -A FORWARD -i bat+ -o vpn+ -j ACCEPT
+	iptables -A FORWARD -i bmx+ -o vpn+ -j ACCEPT
+
+	#block any other
+	iptables -A FORWARD -j LOG --log-prefix "DROP IPv4 FORWARD: " 
+	iptables -A FORWARD -j DROP
+
+#----- setup OUTPUT rules -----
+	echo "setting up OUTPUT rules ..."
+
+	#allow all output	
+	iptables -A OUTPUT -j ACCEPT
+fi
+
+if [ "$1" = "stop" ]; then
+#dont flush backbone, so all rules are still saved and can be used when
+#this firewall4 is restarted
+#        iptables -F T_BACKBONE_I
+#        iptables -X T_BACKBONE_I
+
+#        iptables -F T_BACKBONE_O
+#        iptables -X T_BACKBONE_O
+
+	iptables -t mangle -F PREROUTING
+	iptables -t mangle -F OUTPUT 
+	iptables -t nat -F PREROUTING
+	iptables -t nat -F POSTROUTING
+	iptables -t nat -F OUTPUT 
+	iptables -F INPUT
+        iptables -F FORWARD
+        iptables -F OUTPUT
+fi
+
+
+if [ "$1" = "restart" ]; then
+	$0 stop
+	$0 start
+fi
+
+

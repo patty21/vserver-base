@@ -1,0 +1,11 @@
+#dns server
+#use the following command to trace the dns resolution: dig +trace 100.ddmesh.de
+#I also have removed the NS records from kundencenter.ispon-business.de and have
+#added my own record to point to my dns server
+bind9
+bind9-host
+bind9-utils
+
+post-cmd:mkdir -p /var/log/named
+post-cmd:chown bind:bind /var/log/named
+

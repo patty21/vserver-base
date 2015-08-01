@@ -1,0 +1,7 @@
+#keep localhost uptodate
+ntp
+
+#time client only for development checks
+#/etc/inet.conf should have "time" lines in configuration; restart inetd (openbsd-inetd)
+rdate
+

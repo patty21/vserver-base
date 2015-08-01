@@ -1,0 +1,26 @@
+lua5.1
+
+#cgi
+liblua5.1-cgi0
+
+#json
+liblua5.1-json
+
+#md5
+liblua5.1-md5-0
+
+#regex
+#liblua5.1-rex-pcre0
+
+#rrd
+#liblua5.1-rrd0
+
+#ssl
+#liblua5.1-sec1
+
+#mysql
+#lua5.1-sql-mysql-2
+
+#parrot - virtual machine for lua
+parrot
+

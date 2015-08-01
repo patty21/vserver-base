@@ -1,0 +1,4 @@
+
+#install basics to enable sshd to forward X11. it also installes some x applications
+xbase-clients
+

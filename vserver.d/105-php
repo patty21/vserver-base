@@ -1,0 +1,22 @@
+php5
+php5-common
+php5-cli
+php5-gd
+php5-json
+
+php5-mcrypt
+post-cmd:php5enmod mcrypt
+post-cmd:service apache2 restart
+
+php5-intl
+
+#sma php script
+php-pear
+php-http
+php-http-request
+post-cmd:pear install HTTP_Request2
+
+#php class HttpRequest (fuer statistic benutzt) 
+php5-dev
+post-cmd:pecl install pecl_http
+

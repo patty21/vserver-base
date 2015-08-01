@@ -1,0 +1,174 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S52bmx6
+# Required-Start:    S42firewall6
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start bmxd 
+# Description:       bmxd
+### END INIT INFO
+exit
+ARG1=$1
+
+DAEMON=bmx6
+DAEMON_PATH=/usr/bin
+#save added interfaces (from vtun). used to add interfaces if bmx6 has crashed/restarted
+IF_FILES=/var/run/ddmesh/bmx6/interfaces
+LOCK=/tmp/bmx6.lock
+
+mkdir -p $IF_FILES
+
+eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
+
+_IF=""
+##add pending interfaces
+#for i in $(ls $IF_FILES)
+#do
+#	_IF="$_IF --dev $i"
+#done
+
+#count=0
+#for n in $(nvram show | sed -n '/backbone_range_/{s#.*:\(.*\):.*#\1#p}')
+#do
+##	echo "[$n]"
+#	for((i=0;i<n;i++))
+#	do
+#		_IF="$_IF --dev tbb$count"
+#		count=$((count+1))
+#	done
+#done
+
+for((i=0;i<50;i++))
+do
+	_IF="$_IF --dev tbb$i /announce 1"
+done
+#echo "interfaces: $_IF"
+
+#---tunnel---
+TUN_IFACE_PREFIX="tunDevName=bmx"
+
+#-annouce node with its client-range 
+TUN_NODE="tunDev=if /tun4Address=$_ddmesh_ip/$_ddmesh_dhcprangepre /tun6Address=$_ddmesh_mesh6ip/$_ddmesh_mesh6nodepre"
+
+#-search nodes 
+TUN_v4MESH_OUT="tunOut=v4MeshNodes /network=$_ddmesh_network/$_ddmesh_netpre /minPrefixLen=$_ddmesh_netpre /tableRule=500/61"
+TUN_v6MESH_OUT="tunOut=v6MeshNodes /network=$_ddmesh_mesh6net/$_ddmesh_mesh6pre /tableRule=500/61"
+TUN_MESH="--tunOutTimeout 0 $TUN_NODE $TUN_v4MESH_OUT $TUN_v6MESH_OUT"
+
+#---dynamic---
+#option to search a node; prefered_gateway is the hostname ('r49')
+#PREFERED_GATEWAY="$(uci -q get ddmesh.bmx6.prefered_gateway)"
+test -n "$PREFERED_GATEWAY" && PREFERED_GATEWAY_OPT="/gwName $PREFERED_GATEWAY /rating=100"
+
+#options to create in-iface, annouce gateway (bit/s)
+GATEWAY4_OFFER_OPTS="tunOut=-v4GatewayOut tunIn=v4GatewayIn /network=0.0.0.0/0 /bandwidth=32000000"
+GATEWAY6_OFFER_OPTS="tunOut=-v6GatewayOut tunIn=v6GatewayIn /network=::/0 /bandwidth=32000000"
+GATEWAY4_SEARCH_OPTS="tunIn=-v4GatewayIn tunOut=v4GatewayOut /network=0.0.0.0/0 /minPrefixLen=0 /maxPrefixLen=0 /hysteresis=30 /tableRule=502/62 $PREFERED_GATEWAY_OPT"
+GATEWAY6_SEARCH_OPTS="tunIn=-v6GatewayIn tunOut=v6GatewayOut /network=::/0 /minPrefixLen=0 /maxPrefixLen=0 /hysteresis=30 /tableRule=502/62 $PREFERED_GATEWAY_OPT"
+
+#---HNA (icvpn)---
+#add 172er as one hna to avoie udp_data_size exceeded
+#combine all 10er ranges, except dresden (10.192.0.0/11). all other masks match all other ip ranges
+HNA4_OFFER_OPTS_1="tunIn=v4Hna1 /network=172.0.0.0/8 /bandwidth=32000000"
+HNA4_OFFER_OPTS_2="tunIn=v4Hna3 /network=10.0.0.0/9 /bandwidth=32000000"
+HNA4_OFFER_OPTS_3="tunIn=v4Hna4 /network=10.128.0.0/10 /bandwidth=32000000"
+HNA4_OFFER_OPTS_4="tunIn=v4Hna5 /network=10.224.0.0/11 /bandwidth=32000000"
+#HNA_OFFER_OPTS="$HNA4_OFFER_OPTS_1 $HNA4_OFFER_OPTS_2 $HNA4_OFFER_OPTS_3 $HNA4_OFFER_OPTS_4"
+#UHNA geht nur mit ipv6 addressen
+#UHNA="--unicastHna 172.0.0.0/8 --unicastHna 104.0.0.0/8--unicastHna 10.0.0.0/9 --unicastHna 10.128.0.0/10 --unicastHna 10.224.0.0/11"
+
+# hna suche in clients
+#bmx6 -c tunOut=Icvpn1 /network=172.0.0.0/8 /minPrefixLen=8
+#bmx6 -c tunOut=Icvpn2 /network=104.0.0.0/8 /minPrefixLen=8
+#bmx6 -c tunOut=Icvpn3 /network=10.0.0.0/9 /minPrefixLen=9
+#bmx6 -c tunOut=Icvpn4 /network=10.128.0.0/10 /minPrefixLen=10
+#bmx6 -c tunOut=Icvpn5 /network=10.224.0.0/11 /minPrefixLen=11
+
+#combine options: default search for gateway and prefered gateway
+#DAEMON_OPTS="--plugin bmx6_json.so $TUN_IFACE_PREFIX $TUN_MESH $GATEWAY4_SEARCH_OPTS $GATEWAY6_SEARCH_OPTS $_IF --syslog 0"
+DAEMON_OPTS="$TUN_IFACE_PREFIX $TUN_MESH $GATEWAY4_SEARCH_OPTS $GATEWAY6_SEARCH_OPTS $HNA_OFFER_OPTS $UHNA $_IF --syslog 0"
+echo "[$DAEMON_OPTS]"
+
+test -x $DAEMON_PATH/$DAEMON || exit 0
+
+case "$ARG1" in
+  start)
+	echo "Starting $DAEMON: opt: $DAEMON_OPTS"
+echo "/tmp/core" > /proc/sys/kernel/core_pattern
+#	cd /tmp; ulimit -c unlimited ; $DAEMON_PATH/$DAEMON $DAEMON_OPTS d=0 > /tmp/bmx6.log&
+	cd /tmp; ulimit -c unlimited ; $DAEMON_PATH/$DAEMON $DAEMON_OPTS 
+#	$DAEMON_PATH/$DAEMON $DAEMON_OPTS 
+	;;
+
+  stop)
+	echo "Stopping $DAEMON: "
+	killall $DAEMON
+	;;
+
+  restart|force-reload)
+	$0 stop
+	sleep 1
+	$0 start
+	;;
+
+  gateway4)
+        echo $DAEMON -c $GATEWAY4_OFFER_OPTS
+        $DAEMON_PATH/$DAEMON -c $GATEWAY4_OFFER_OPTS
+        ;;
+
+  no_gateway4)
+        echo $DAEMON -c $GATEWAY4_SEARCH_OPTS
+        $DAEMON_PATH/$DAEMON -c $GATEWAY4_SEARCH_OPTS
+        ;;
+        
+  gateway6)
+        echo $DAEMON -c $GATEWAY6_OFFER_OPTS
+        $DAEMON_PATH/$DAEMON -c $GATEWAY6_OFFER_OPTS
+        ;;
+
+  no_gateway6)
+        echo $DAEMON -c $GATEWAY6_SEARCH_OPTS
+        $DAEMON_PATH/$DAEMON -c $GATEWAY6_SEARCH_OPTS
+        ;;
+        
+  check)
+	test -z "$(pidof $DAEMON)" && logger -s "$DAEMON not running - restart" && $0 restart && exit
+        ;;
+
+  addif)
+	#tbb interfaces are added here, do not annouce this ip again (perhaps not needed)
+	#add lock because of wenn vtun ends, all vtun processes will try to remove there interface from bmx6 at same time,
+	#which bmx6 can not handle at same time
+	#try to get lock for file created by exec with file descriptor8. wait max 10 seconds
+	exec 8>$LOCK
+	if flock -x -w 10 8; then
+		logger -t S52bmx6 "$DAEMON_PATH/$DAEMON -c --dev $2 /announce 1"
+		touch $IF_FILES/$2
+#		$DAEMON_PATH/$DAEMON -c --dev $2 /announce 1
+	else
+		logger -t S52bmx6 "failed get flock to add dev $2"
+	fi
+	;;
+
+  delif)
+	#add lock because of wenn vtun ends, all vtun processes will try to remove there interface from bmx6 at same time,
+	#which bmx6 can not handle at same time
+	exec 8>$LOCK
+	if flock -x -w 10 8; then
+		logger -t S52bmx6 "$DAEMON_PATH/$DAEMON -c --dev -$2"
+		rm $IF_FILES/$2
+#		$DAEMON_PATH/$DAEMON -c --dev -$2
+	else
+		logger -t S52bmx6 "failed get flock to rm dev $2"
+	fi
+	;;
+
+  *)
+        echo "Usage: $0 {start|stop|restart|addiff|delif|gateway4|gateway6|no_gateway4|no_gateway6|check}" >&2
+        exit 1         ;;
+
+
+esac
+
+exit 0

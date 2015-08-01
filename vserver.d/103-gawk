@@ -1,0 +1,2 @@
+#used by gen_google_database.sh for binary AND operations
+gawk

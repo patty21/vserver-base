@@ -1,0 +1,25 @@
+
+build-essential
+libz-dev
+liblzo2-dev
+libssl-dev
+bison
+flex
+
+#fuer bmx6 json plugin
+libjson0
+libjson0-dev
+
+#fuer bmx6-dev
+libpolarssl-dev
+
+#fuer qrencode
+libpng12-dev
+
+#tinc
+libreadline6-dev
+
+
+#fuer fastd
+pkg-config
+cmake

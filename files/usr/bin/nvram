@@ -1,0 +1,20 @@
+#!/bin/sh
+
+
+case "$1" in
+	show)
+		cat /etc/nvram.conf 
+	;;
+	
+	get)
+		cat /etc/nvram.conf | sed -n "/^$2/{s#^.*=##;p}"
+	;;
+	
+	set) 	echo "not supported"
+	;;
+
+	*) echo "usage: nvram [get name] [set name=value] [unset name] [show]" 
+	;; 	
+esac
+
+

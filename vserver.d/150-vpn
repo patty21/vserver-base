@@ -1,0 +1,7 @@
+tinc
+#libs needed for tinc-beta from http://www.tinc-vpn.org/download/
+libncurses5-dev
+libreadline-dev
+
+openvpn
+

@@ -1,0 +1,16 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          S90nuttcp
+# Required-Start:    $network
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: speed test server 
+# Description:       speed test server 
+### END INIT INFO
+
+if [ "$1" = "start" ] ; then
+	nuttcp -S -P5010
+fi
+
+

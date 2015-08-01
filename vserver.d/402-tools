@@ -1,0 +1,8 @@
+gnupg
+git
+subversion
+
+
+#network traffic measurements
+iptraf
+vnstat

@@ -1,0 +1,226 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S53backbone
+# Required-Start:    S40network
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start vtun backbone 
+# Description:       start vtun backbone 
+### END INIT INFO
+
+WAN_DEV=eth0
+TBB_DEV=tbb-br
+
+eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
+
+VTUND=/usr/sbin/vtund
+#VTUND=echo
+LOGDIR=/var/log/vtund
+CONF=/etc/vtund.conf
+#CONF=/tmp/vtund.conf
+BACKBONE_DEV=tbb
+NUMBER_OF_CLIENTS=$(nvram get backbone_max_tunnel)
+DEFAULT_PORT=5000
+DEFAULT_PASSWD=freifunk
+
+backbone_server_port=$DEFAULT_PORT
+backbone_server_passwd=$DEFAULT_PASSWD
+backbone_server_enabled=$(nvram get backbone_server_enabled)
+backbone_clients_enabled=$(nvram get backbone_clients_enabled)
+
+# die option "ifname" habe ich eingebaut, damit werden die interfaces automatisch von vtund umbenannt und eine
+# laufende nummer angehaengt.
+createconf () {
+ cat<<EOM >$CONF
+options {
+ syslog 9;
+ timeout 30;
+ ifname tbb;
+}
+default {
+ speed 0;
+ #compress lzo:9;
+ #compress zlib:9;
+ compress no;
+}
+EOM
+}
+
+#addconf <name> <pw> <count> <tcp|udp> <use-bridge>
+#use-bridge: wenn 1, dann wird bridge verwendet, sonst wird das tbb interface normal configuriert
+#bsp: backbone-10-2 freifunk count protocol 1
+addconf() {
+
+#option: "multi no" - only one client;to ensure that the old interface is deleted before creating new one (in case connection is dead and client creates a new one.e.g. IP address change on DSL line)
+
+ cat << EOM >>$CONF
+$1 {
+ passwd a$(echo "$2" | md5sum | sed 's# .*$##')78; 
+ type ether;
+ proto $4;
+ encrypt no;
+ compress no;
+ stat no;
+ keepalive 10:1;
+ multi no;
+ persist yes;
+ up { 
+EOM
+	if [ -n "$5" ]; then
+		echo "program /sbin/brctl \"addif $TBB_DEV %%\" ;" >>$CONF
+		echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
+	else
+		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
+		echo "program /sbin/ip \"link set %% promisc on\" wait;" >>$CONF
+ 		echo "program /sbin/ip \"addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
+		echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
+		echo "program /etc/init.d/S52batmand \"addif %%\" wait;" >>$CONF
+	fi
+	echo " };" >>$CONF
+ 	echo "down {" >>$CONF
+	if [ -n "$5" ]; then
+		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
+		echo "program /sbin/brctl \"delif $TBB_DEV %%\" ;" >>$CONF
+	else
+		echo "program /etc/init.d/S52batmand \"delif %%\" wait;" >>$CONF
+		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
+		echo "program /sbin/ip \"addr del $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
+	fi
+	echo " };" >>$CONF
+	echo "}" >>$CONF
+}
+
+if [ "$1" = "start" ]; then
+	echo "Starting backbone..."
+
+	mkdir -p $LOGDIR
+	mkdir -p /var/lock/vtund/
+
+	createconf
+	if_count=0
+	
+ 	if [ "$backbone_server_enabled" = "1" ]; then
+
+		#create bridge which holds all tbb devices only for server!!!! never for clients !!!
+		brctl addbr $TBB_DEV
+		ip addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $TBB_DEV
+		ip link set dev $TBB_DEV up
+		
+		IFS='
+'
+		N=0
+		#ranges
+		for i in $(nvram show 2>/dev/null | grep "^backbone_range_[0-9]" | sed 's#^.*=##')
+		do
+			test "$N" = "$NUMBER_OF_CLIENTS" && break;
+			echo range line:$i
+			IFS=' :'; set $i
+			start="$1"
+			count="$2"
+			PW="$3"
+			PW=${PW:-$DEFAULT_PASSWD}
+			PROT="$4"
+
+			for (( k=0; k<$count; k++ ))
+			do
+				NAME="backbone2-r$((start+k))"
+				echo "range=[$NAME:$PW]" 
+				addconf $NAME $PW $if_count $PROT
+				if_count=$((if_count+1))	
+			done
+		
+		done
+		#single clients
+		IFS='
+'
+		for i in $(nvram show 2>/dev/null | grep "^backbone_accept_[0-9]" | sed 's#^.*=##')
+		do
+			test "$N" = "$NUMBER_OF_CLIENTS" && break;
+			echo accept line:$i
+			IFS=' :'; set $i
+			PW="$2"
+			PW=${PW:-$DEFAULT_PASSWD}
+			PROT="$3"
+			NAME="backbone2-$1"
+			echo "accept=[$NAME:$PW]" 
+			addconf $NAME $PW $if_count $PROT
+
+			if_count=$((if_count+1))	
+		done
+				
+		#allow vpn connection to and from wan/lan port
+		if [ -n "$WAN_DEV" ]; then
+	  		iptables -A T_BACKBONE_I -i $WAN_DEV -p udp --dport $backbone_server_port -j ACCEPT
+	  		iptables -A T_BACKBONE_I -i $WAN_DEV -p tcp --dport $backbone_server_port -j ACCEPT
+		fi
+		
+		#allow vpn connections from lo dev because of putty connections
+	  	iptables -A T_BACKBONE_I -i lo -p udp --dport $backbone_server_port -j ACCEPT
+	  	iptables -A T_BACKBONE_I -i lo -p tcp --dport $backbone_server_port -j ACCEPT
+
+		#drop other vpn connections
+		iptables -A T_BACKBONE_I -p udp --dport $backbone_server_port -j DROP
+		iptables -A T_BACKBONE_I -p tcp --dport $backbone_server_port -j DROP
+		
+		#protect port	
+#		iptables -t nat -I MAIN_PORT_FORWARDING -p tcp --dport $backbone_server_port -j ACCEPT
+#		iptables -t nat -I MAIN_PORT_FORWARDING -p udp --dport $backbone_server_port -j ACCEPT
+		
+		$VTUND -s -P $backbone_server_port
+		echo "vtund - server started."
+	fi
+
+ 	if [ "$backbone_clients_enabled" = "1" ]; then	
+ 		test -n "$WAN_DEV" && iptables -A T_BACKBONE_I -i $WAN_DEV -m state --state ESTABLISHED,RELATED -j ACCEPT
+ 		
+		IFS='
+'
+		N=0
+		for i in $(nvram show 2>/dev/null | grep "^backbone_host_[0-9]" | sed 's#^.*=##')
+		do
+			test "$N" = "$NUMBER_OF_CLIENTS" && break;
+			echo line:$i
+			IFS=' :'; set $i
+			HOST="$1"
+			PORT="$2"
+			PW="$3"
+			PROT="$4"
+			PORT=${PORT:-$DEFAULT_PORT}
+			PW=${PW:-$DEFAULT_PASSWD}
+			echo "host=[$HOST:$PORT:$PW]" 
+			test -z "$HOST" && continue
+			NAME="backbone2-$_ddmesh_hostname"
+				
+	 		addconf	$NAME $PW $if_count $PROT
+			if_count=$((if_count+1))	
+	 		
+			#deny output of backbone to wifi/batmand tunnel
+			iptables -A T_BACKBONE_O -o bat+ -p tcp --dport $PORT -j DROP
+			iptables -A T_BACKBONE_O -o bat+ -p udp --dport $PORT -j DROP
+			
+			$VTUND -P $PORT $NAME $HOST
+			echo "vtund - client $HOST:$PORT started."
+			N=$((N+1))
+		done
+		unset IFS
+	fi
+fi
+
+if [ "$1" = "stop" ]; then
+	echo "Stopping backbone..."
+	iptables -F T_BACKBONE_I
+	iptables -F T_BACKBONE_O
+	killall vtund
+	ip link set dev $TBB_DEV down
+	brctl delbr $TBB_DEV
+fi
+
+
+if [ "$1" = "restart" ]; then
+	$0 stop
+	sleep 2
+	$0 start
+fi
+
+
