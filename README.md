@@ -93,7 +93,14 @@ Wenn das fertig ist, müssen Community-Spezifische Dinge angepasst werden:
 */etc/openvpn/....
 Mehr fällt mir gerade nicht ein ;-)
 
+Wichig:
+------
+Im moment gibt es keinen Schutz, dass Routerfirmware einer Communitiy sich mit Servern oder Routern anderer Communities verbinden. Es ist <b>Fatal<b/> wenn sich die Netze wegen gleicher WLAN BSSID oder via Backbone verbinden. Da überall das gleiche Routingprotokoll verwendet wird, würden Geräte von verschiedenen Communities miteinander reden können und das Netz würde gigantisch groß und die Router überlasten.
 
+Bitte einhalten:
+* Ändern der BSSID auf eine eigenen
+* Keine Verwendung von Registratoren anderen Communities (Webserverdienst zum Verteilen von Knotennummern)
+* Kein Aufbau von Brücken zwischen Routern/Vservern verschiedener Communities über Backboneverbindungen. (das wird in zukunft noch unterbunden, dazu ist aber eine Änderung am Routingprotokoll notwendig). Verbindungen von Communities dürfen nur über das ICVPN erfolgen.
 
 Links:
 ------
