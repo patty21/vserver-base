@@ -36,6 +36,8 @@ Internet-Gateway im Freifunknetz bekannt gegeben.
 
 - Auch der Vserver arbeitet als DNS Server für die Knoten, die ihn als Gateway ausgewählt haben. Der Vserver leitet allerdings die DNS Anfragen nicht über den Openvpn Tunnel, sonder geht direkt über den VServer Anbieter raus.
 
+- ICVPN: Für ICVPN wird eigentlich alles installiert, aber ich abe dieses noch nicht mit dieser Installation getestet, da es ein Extra-Service ist und nicht auf jedem VServer in einem Netz aktiv sein braucht. Es gibt ein script, welches ebenfall dafür angepasst werden muss /etc/quagga/gen-bgpd.conf. Dieses Script greift auf github (wo alle Communities ihre Daten hinterlegen) und erzeugt entsprechende eine Konfiguration. Einfach mal damit experiementieren. Hilfreich sind hier die Befehle "ip rule" und "ip route list table zebra". Alternativ gibt es noch andere bgp Daemons, die von anderen Freifunk Communities verwendet werden (bird). Damit habe ich aber noch keine Experimente gemacht. Scripte für die Generierung von Konfigurationsfiles für bird gibt es auch irgendwo  im Github.
+
 Links:
 ------
 <a href="www.freifunk-dresden.de" >Freifunk Dresden</a><br>
