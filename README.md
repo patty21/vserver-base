@@ -50,6 +50,51 @@ Internet-Gateway im Freifunknetz bekannt gegeben.
 <br/></br/>
 Wichtig ist, dass tun/tap devices und alle möglichen iptables module möglich sind. IPv6 ist nicht notwendig, da das Freifunk Netz in Dresden nur IPv4 unterstütz (Platzmangel auf Routern, bmxd unterstützt dieses nicht)
 
+Installation:
+----
+Notwendig ist eine Ubuntu minimal Installation. Diese wird oft in der Version 14.04 TLS vom Vserveranbieter angeboten.
+
+Schritte:<br/>
+
+1. bringe Ubuntu auf die aktuelle Version. Das geht bei Ubuntu Schrittweise von Version zu Version.
+https://help.ubuntu.com/community/UpgradeNotes
+Wähle dafür aber die "server-⁠variante" (nicht desktop).
+
+2. Für den Upgrade-Prozess wird der "update-manager" verwendet.
+Dabei stolbert man über "TLS". Damit man auf 15.04 upgraden kann, muß<br/>
+ /etc/update-manager/release-upgrades<br/>
+ "Prompt" auf normal setzen.
+
+3. Am Ende kann die Ubuntu-Version mit überprüft werden.<br/>
+lsb_release -a
+<pre>
+No LSB modules are available.
+Distributor ID: Ubuntu
+Description:    Ubuntu 15.04
+Release:        15.04
+Codename:       vivid
+</pre>
+
+
+4. Folgends cloned das Repository. Bitte verwendet eurer eignes geclontes Repository.
+<pre>
+mkdir /⁠root/⁠freifunk
+cd /⁠root/⁠freifunk
+apt-⁠get install git
+git clone git@github.com:ddmesh/vserver-base.git
+cd freifunk-base
+./⁠vserver-⁠install.sh
+</post>
+Es werden einige Pakete nachinstalliert, Files kopiert und am Ende noch einige Tools compiliert.
+Wenn das fertig ist, müssen Community-Spezifische Dinge angepasst werden:
+*ddmesh-ipcalc.sh
+*/etc/nvram.conf
+*/etc/quagga/gen-bgpd.conf (optional)
+*/etc/openvpn/....
+Mehr fällt mir gerade nicht ein ;-)
+
+
+
 Links:
 ------
 <a href="www.freifunk-dresden.de" >Freifunk Dresden</a><br>
