@@ -3,6 +3,9 @@
 echo 'Content-type: text/plain txt'
 echo ''
 
+LOCK=/tmp/sysinfo.lock
+lock $LOCK
+
 BMXD_DB_PATH=/var/lib/freifunk/bmxd
 ddmesh_node=$(nvram get ddmesh_node)
 test -z "$ddmesh_node" && exit
@@ -14,7 +17,7 @@ WLDEV=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
 
 cat << EOM
 {
- "version":"4",
+ "version":"5",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -151,3 +154,6 @@ cat << EOM
   }
 }
 EOM
+
+lock -u $LOCK
+

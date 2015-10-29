@@ -24,7 +24,7 @@ cp jshn.sh /usr/bin/
 echo "############## mynuttcp #########################"
 cd $P/mynuttcp
 echo "compiling mynuttcp..."
-bunzip2 nuttcp-6.1.2.tar.bz2
+bunzip2 -k nuttcp-6.1.2.tar.bz2
 tar xf nuttcp-6.1.2.tar
 cd nuttcp-6.1.2
 make

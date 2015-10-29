@@ -11,8 +11,10 @@ ip route add default dev $dev via $route_vpn_gateway table gateway_pool metric $
 iptables -t nat -A POSTROUTING -o vpn+ -j SNAT --to-source $ifconfig_local
 
 #update gateway infos and routing tables, fast after openvpn open connection
-#Run in background, else openvpn blocks
-/usr/bin/freifunk-gateway-check.sh&
+#Run in background, else openvpn blocks. but avoid restarting ovpn by check-script
+#if no connection could be made. this would produces a permanent fast restart loop of
+#openvpn
+/usr/bin/freifunk-gateway-check.sh no-ovpn-restart&
 
 #tell always "ok" to openvpn;else in case of errors of "ip route..." openvpn exits
 exit 0

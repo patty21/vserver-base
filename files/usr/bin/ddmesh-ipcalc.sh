@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 #     0 - 99      vserver
+#   900 -   999   temp Knoten, bei Inbetriebnahme
 #  1000           spezial:start point for registrator
 #  1001 - 50999   Knotennummer für Firmware: vergeben durch registrator
 # 51000 - 59999   Knotennummer für eigen Aufgebaute Knoten

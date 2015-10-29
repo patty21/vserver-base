@@ -186,7 +186,10 @@ if ! $ok; then
 
 	# try to restart openvpn, in case connection is dead, but active ($ok was true)
 	# also if no vpn was active ($ok was false)
-	/etc/init.d/openvpn restart
+	#but only if no "no-ovpn-restart" was passed
+	if [ -z "$1" ]; then
+		/etc/init.d/openvpn restart
+	fi
 fi
 
 $DEBUG && echo "end."
