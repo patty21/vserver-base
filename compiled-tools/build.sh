@@ -1,7 +1,7 @@
 #!/bin/bash
 #compiles/installes all needed host tools
 
-P=~/freifunk/vserver-freifunk/compiled-tools
+P=~/freifunk/vserver-base/compiled-tools
 
 echo "############## bmxd #########################"
 cd $P/bmx/bmxd
