@@ -49,7 +49,7 @@ if [ "$1" = "start" ]; then
 	ip addr add $_ddmesh_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $PRIMARY_IF 
 	ip link set dev $PRIMARY_IF up
 fi
-_IF="dev=$PRIMARY_IF /linklayer 0 dev=tbb-br"
+_IF="dev=$PRIMARY_IF /linklayer 0"
 
 #add pending interfaces
 p=$(pwd)

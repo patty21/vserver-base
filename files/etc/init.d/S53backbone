@@ -10,7 +10,6 @@
 ### END INIT INFO
 
 WAN_DEV=eth0
-TBB_DEV=tbb-br
 
 eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
 
@@ -67,26 +66,16 @@ $1 {
  persist yes;
  up { 
 EOM
-	if [ -n "$5" ]; then
-		echo "program /sbin/brctl \"addif $TBB_DEV %%\" ;" >>$CONF
-		echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
-	else
-		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
-		echo "program /sbin/ip \"link set %% promisc on\" wait;" >>$CONF
- 		echo "program /sbin/ip \"addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
-		echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
-		echo "program /etc/init.d/S52batmand \"addif %%\" wait;" >>$CONF
-	fi
+	echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
+	echo "program /sbin/ip \"link set %% promisc on\" wait;" >>$CONF
+ 	echo "program /sbin/ip \"addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
+	echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
+	echo "program /etc/init.d/S52batmand \"addif %%\" wait;" >>$CONF
 	echo " };" >>$CONF
  	echo "down {" >>$CONF
-	if [ -n "$5" ]; then
-		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
-		echo "program /sbin/brctl \"delif $TBB_DEV %%\" ;" >>$CONF
-	else
-		echo "program /etc/init.d/S52batmand \"delif %%\" wait;" >>$CONF
-		echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
-		echo "program /sbin/ip \"addr del $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
-	fi
+	echo "program /etc/init.d/S52batmand \"delif %%\" wait;" >>$CONF
+	echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
+	echo "program /sbin/ip \"addr del $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
 	echo " };" >>$CONF
 	echo "}" >>$CONF
 }
@@ -102,11 +91,6 @@ if [ "$1" = "start" ]; then
 	
  	if [ "$backbone_server_enabled" = "1" ]; then
 
-		#create bridge which holds all tbb devices only for server!!!! never for clients !!!
-		brctl addbr $TBB_DEV
-		ip addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $TBB_DEV
-		ip link set dev $TBB_DEV up
-		
 		IFS='
 '
 		N=0
@@ -212,8 +196,6 @@ if [ "$1" = "stop" ]; then
 	iptables -F T_BACKBONE_I
 	iptables -F T_BACKBONE_O
 	killall vtund
-	ip link set dev $TBB_DEV down
-	brctl delbr $TBB_DEV
 fi
 
 
