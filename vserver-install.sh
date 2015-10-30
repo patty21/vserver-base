@@ -119,6 +119,9 @@ echo "========================================================="
 echo "running post-commands"
 $POSTINSTALL $FILES
 
+apt-get autoremove
+
 echo "========================================================="
 echo "finished."
+
 
