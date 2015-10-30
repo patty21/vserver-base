@@ -4,6 +4,7 @@ libz-dev
 liblzo2-dev
 libssl-dev
 bison
+#byacc
 flex
 
 #fuer bmx6 json plugin
@@ -17,7 +18,8 @@ libpolarssl-dev
 libpng12-dev
 
 #tinc
-libreadline6-dev
+libreadline-dev
+libncurses5-dev
 
 
 #fuer fastd
