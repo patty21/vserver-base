@@ -1,7 +1,8 @@
 #!/bin/bash
 #compiles/installes all needed host tools
 
-install_dir=$(dirname $0)
+cd $(dirname $0)
+install_dir=$(pwd)
 
 echo "############## bmxd #########################"
 cd $install_dir/bmx/bmxd
