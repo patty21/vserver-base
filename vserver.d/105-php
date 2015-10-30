@@ -18,5 +18,10 @@ post-cmd:pear install HTTP_Request2
 
 #php class HttpRequest (fuer statistic benutzt) 
 php5-dev
+libpcre3-dev
+post-cmd:pecl install raphf
+post-cmd:pecl install propro 
+#activate extensions raphf, propro before pecl_http
+post-cmd:php5enmod freifunk
 post-cmd:pecl install pecl_http
 
