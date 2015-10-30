@@ -32,6 +32,10 @@ INST_PACKAGES=/tmp/vserver-install-packages.sh
 PREINSTALL=/tmp/vserver-preinstall.sh
 POSTINSTALL=/tmp/vserver-postinstall.sh
 
+#change to install directory
+install_dir=$(dirname $0)
+cd $install_dir
+
 rm -rf $PRE_INST_PACKAGES $INST_PACKAGES $PREINSTALL $POSTINSTALL
 > $PRE_INST_PACKAGES
 chmod 755 $PRE_INST_PACKAGES
