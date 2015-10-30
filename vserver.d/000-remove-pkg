@@ -1,0 +1,7 @@
+# this file is used to remove conflicting packages
+
+
+# remove bluez on some vserver installation which produces errors when installing
+# libpng12-dev
+
+pre-inst-cmd:apt-get remove bluez

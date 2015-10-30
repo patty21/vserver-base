@@ -1,4 +1,5 @@
 #!/bin/bash
+#version 2
 #install vserver stuff
 #all files in vserver.d are enumerated. 
 #each file may contain a package name, url, shell-command or package file name.
@@ -13,20 +14,29 @@
 #package name:	a debian package name that should be installed
 #e.g:bind9
 #
-#pre-command: a shell command that is executed AFTER installing packages
+#pre-cmd: a shell command that is executed AFTER installing packages
 #pre-cmd: rm /etc/apache2/site-enabled/*
 #
-#post-command:	a shell command is exectuted AFTER installing packages and files. a temporary file is created with all the commands
+#post-cmd:	a shell command is exectuted AFTER installing packages and files. a temporary file is created with all the commands
 #post-cmd:a2enmod ssl
+#
+#pre-inst-cmd: 	a shell command which is executed before installing packages
+#pre-inst-cmd: apt-get remove bluez
 
 
 PKG_DIR=dl
 LIST_DIR=vserver.d
 FILES=files
+PRE_INST_PACKAGES=/tmp/vserver-preinstall-packages.sh
+INST_PACKAGES=/tmp/vserver-install-packages.sh
 PREINSTALL=/tmp/vserver-preinstall.sh
 POSTINSTALL=/tmp/vserver-postinstall.sh
 
-rm -rf $PREINSTALL $POSTINSTALL
+rm -rf $PRE_INST_PACKAGES $INST_PACKAGES $PREINSTALL $POSTINSTALL
+> $PRE_INST_PACKAGES
+chmod 755 $PRE_INST_PACKAGES
+> $INST_PACKAGES
+chmod 755 $INST_PACKAGES
 > $PREINSTALL
 chmod 755 $PREINSTALL
 > $POSTINSTALL
@@ -70,17 +80,32 @@ do
 				continue
 			fi
 #echo "######3 $p"
+			if [ "${p%%:*}" = "pre-inst-cmd" ]; then
+				cmd="${p#pre-inst-cmd:}"
+				echo "$cmd" >> $PRE_INST_PACKAGES
+				continue
+			fi
 
 
 			#check if we should use apt-get or dpkg
 			if [ "${p##*.}" = "deb" ]; then
-				dpkg -i $PKG_DIR/$p
+				cmd="dpkg -i $PKG_DIR/$p"
+				echo "$cmd" >> $INST_PACKAGES
 			else 
-				apt-get --yes install $p
+				cmd="apt-get --yes install $p"
+				echo "$cmd" >> $INST_PACKAGES
 			fi
 		fi
 	done
 done
+
+echo "========================================================="
+echo "running pre install commands"
+$PRE_INST_PACKAGES
+
+echo "========================================================="
+echo "running install packages"
+$INST_PACKAGES
 
 echo "========================================================="
 echo "running pre-commands"
