@@ -1,10 +1,10 @@
 #!/bin/bash
 #compiles/installes all needed host tools
 
-P=~/freifunk/vserver-base/compiled-tools
+install_dir=$(dirname $0)
 
 echo "############## bmxd #########################"
-cd $P/bmx/bmxd
+cd $install_dir/bmx/bmxd
 echo "compiling bmxd..."
 make
 make strip
@@ -13,7 +13,7 @@ cp bmxd /usr/bin/
 
 
 echo "############## jshn #########################"
-cd $P/json
+cd $install_dir/json
 echo "compiling json..."
 make
 echo "install json"
@@ -22,7 +22,7 @@ cp jshn.sh /usr/bin/
 
 
 echo "############## mynuttcp #########################"
-cd $P/mynuttcp
+cd $install_dir/mynuttcp
 echo "compiling mynuttcp..."
 bunzip2 -k nuttcp-6.1.2.tar.bz2
 tar xf nuttcp-6.1.2.tar
@@ -34,7 +34,7 @@ cp nuttcp-6.1.2 /usr/bin/nuttcp
 
 
 echo "############## myvtun #########################"
-cd $P/myvtun
+cd $install_dir/myvtun
 echo "compiling myvtun..."
 tar xzf vtun-3.0.3.tar.gz
 cp my-modifications/* vtun-3.0.3/
@@ -47,7 +47,7 @@ cp vtund /usr/sbin/
 
 
 echo "############## qrencode #########################"
-cd $P/qrencode
+cd $install_dir/qrencode
 echo "compiling qrencode..."
 tar xzf qrencode-3.4.2.tar.gz
 cp myModification/* qrencode-3.4.2/
@@ -58,7 +58,7 @@ cp qrencode /usr/bin/
 
 
 echo "############## tinc-1.1pre10 #########################"
-cd $P/tinc-1.1pre10
+cd $install_dir/tinc-1.1pre10
 echo "compiling tinc..."
 tar xzf tinc-1.1pre10.tar.gz
 cd tinc-1.1pre10
@@ -70,6 +70,6 @@ cp src/tincd /usr/sbin/
 
 
 echo "############## fastd #########################"
-cd $P/fastd
+cd $install_dir/fastd
 ./build.sh
 
