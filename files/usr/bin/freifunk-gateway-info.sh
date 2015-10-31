@@ -10,6 +10,7 @@ mkdir -p /var/lib/ddmesh
 eval $(ip ro list ta public_gateway | sed -n 's#default.*[ ]\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\) dev \([^ ]\+\).*#via=\1; dev=\2#p')
 if [ -z "$via" ]; then
 	echo "{}" > $DATA
+	cat $DATA
 	exit 1
 fi
 
