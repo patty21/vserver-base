@@ -11,13 +11,13 @@ ddmesh_node=$(nvram get ddmesh_node)
 test -z "$ddmesh_node" && exit
 
 eval $(ddmesh-ipcalc.sh -n $ddmesh_node)
-eval $(sudo /usr/bin/freifunk-gateway-info.sh)
+tunnel_info="$(sudo /usr/bin/freifunk-gateway-info.sh)"
 
 WLDEV=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
 
 cat << EOM
 {
- "version":"5",
+ "version":"6",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -120,16 +120,7 @@ $(cat $BMXD_DB_PATH/gateways | sed -n '
 			"info":[
 $(cat $BMXD_DB_PATH/info | sed 's#^[ 	]*\(.*\)$#\t\t\t\t"\1",#; $s#,[ 	]*$##') ]
 		},
-  		"internet_tunnel":{
-			"ipv4_address":"$iptest_address4",
-			"ipv4_country":"$iptest_country4",
-			"ipv4_country_code":"$iptest_country_code4",
-			"ipv4_imgurl":"$iptest_imgurl4",
-			"ipv6_address":"$iptest_address6",
-			"ipv6_country":"$iptest_country6",
-			"ipv6_country_code":"$iptest_country_code6",
-			"ipv6_imgurl":"$iptest_imgurl6"
-		},
+		"internet_tunnel":$tunnel_info,
 		"connections":[
 EOM
 netstat -tn 2>/dev/null | grep ESTABLISHED | awk '
