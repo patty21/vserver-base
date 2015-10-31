@@ -9,7 +9,7 @@
 # Description:       start vtun backbone 
 ### END INIT INFO
 
-WAN_DEV=eth0
+WAN_DEV=$(nvram get ifname)
 
 eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
 
