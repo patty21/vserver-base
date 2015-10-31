@@ -22,7 +22,7 @@ fi
 #default
 echo "{}" > $DATA
 
-addr=$(nslookup freegeoip.net | sed -n '1,4d;s#.*: \(.*\) .*#\1#p')
+addr=$(nslookup freegeoip.net | sed -n '1,4d;s#.*: \([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\).*#\1#p')
 test -n "$addr" && {
 
 	for ip in $addr; do
