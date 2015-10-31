@@ -4,7 +4,6 @@ libz-dev
 liblzo2-dev
 libssl-dev
 bison
-#byacc
 flex
 
 #fuer bmx6 json plugin

@@ -5,3 +5,7 @@ ntp
 #/etc/inet.conf should have "time" lines in configuration; restart inetd (openbsd-inetd)
 rdate
 
+#update system time after copying /etc/timezone
+post-cmd:dpkg-reconfigure tzdata
+post-cmd:service cron restart
+

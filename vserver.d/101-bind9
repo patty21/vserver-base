@@ -9,3 +9,6 @@ bind9-utils
 post-cmd:mkdir -p /var/log/named
 post-cmd:chown bind:bind /var/log/named
 
+#nslookup
+dnsutils
+
