@@ -1,0 +1,10 @@
+
+#enable automatic updates
+
+unattended-upgrades
+
+#dpkg-reconfigure unattended-upgrades will create
+#/etc/apt/apt.conf.d/20auto-upgrades with new version
+post-cmd:dpkg-reconfigure unattended-upgrades
+
+
