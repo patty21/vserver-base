@@ -6,5 +6,7 @@ unattended-upgrades
 #dpkg-reconfigure unattended-upgrades will create
 #/etc/apt/apt.conf.d/20auto-upgrades with new version
 post-cmd:dpkg-reconfigure unattended-upgrades
+post-cmd:service unattended-upgrades stop
+post-cmd:service unattended-upgrades start
 
 
