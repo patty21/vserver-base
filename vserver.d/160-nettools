@@ -4,3 +4,6 @@ lftp
 
 fping
 rsync
+
+#nslookup
+dnsutils
