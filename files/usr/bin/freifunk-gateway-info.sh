@@ -31,7 +31,7 @@ test -n "$addr" && {
 		ip route add $ip via $via dev $dev table public_gateway
 	done
 
-	info="$(wget -O - http://freegeoip.net/json/ 2>/dev/null )"
+	info="$(wget --prefer-family=IPv4 -O - http://freegeoip.net/json/ 2>/dev/null )"
 
 	for ip in $addr; do
 		ip rule del prio 200 to $ip table public_gateway
