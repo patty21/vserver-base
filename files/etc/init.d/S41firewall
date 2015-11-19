@@ -164,6 +164,7 @@ if [ "$1" = "start" ]; then
         #via gleichem dns server (wie in resolv.conf) kommen. diese werden von firewall geblockt.
         #erlaube dns anfragen via localem server
         iptables -A FORWARD -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
+        iptables -A FORWARD -i bmx+ -p udp --dport 53 -j ACCEPT
 
 	#allow forward to openvpn tunnel 
 	iptables -A FORWARD -i $BACKBONE_DEV -o vpn+ -j ACCEPT
