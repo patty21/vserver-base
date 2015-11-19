@@ -101,11 +101,10 @@ if [ "$1" = "start" ]; then
         #nuttcp
         iptables -A INPUT -i $BACKBONE_DEV -d $_ddmesh_ip -p tcp --dport 5010 -j ACCEPT
         iptables -A INPUT -i $BACKBONE_DEV -d $_ddmesh_ip -p tcp --dport 5011 -j ACCEPT
-        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5010 -j ACCEPT
-        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5011 -j ACCEPT
+#bmx6        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5010 -j ACCEPT
+#bmx6        iptables -A INPUT -i bmx+ -d $_ddmesh_ip -p tcp --dport 5011 -j ACCEPT
 
 	#dns
-	iptables -A INPUT -i $BACKBONE_DEV -p TCP --dport 53 -j ACCEPT
 	iptables -A INPUT -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
 
 	#ssh
@@ -147,29 +146,29 @@ if [ "$1" = "start" ]; then
 	iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
 
 	iptables -A FORWARD -i $BACKBONE_DEV -o $BACKBONE_DEV -j ACCEPT
-	iptables -A FORWARD -i $BACKBONE_DEV -o bmx+ -j ACCEPT
-	iptables -A FORWARD -i bmx+ -o bmx+ -j ACCEPT	
+#bmx6	iptables -A FORWARD -i $BACKBONE_DEV -o bmx+ -j ACCEPT
+#bmx6	iptables -A FORWARD -i bmx+ -o bmx+ -j ACCEPT	
 
 	#allow forward freifunk and internet to icvpn
 #X#	iptables -A FORWARD -i icvpn -s 10.200.0.0/15 -j DROP 
 #X#	iptables -A FORWARD -i bat+ -o icvpn -j ACCEPT	
-#X#	iptables -A FORWARD -i bmx+ -o icvpn -j ACCEPT	
+#bmx6 #X#	iptables -A FORWARD -i bmx+ -o icvpn -j ACCEPT	
 
 #X#	iptables -A FORWARD -i $BACKBONE_DEV -o icvpn -j ACCEPT
 #X#	iptables -A FORWARD -i icvpn -o $BACKBONE_DEV -d 10.200.0.0/15 -j ACCEPT
-#X#	iptables -A FORWARD -i icvpn -o bmx+ -d 10.200.0.0/15 -j ACCEPT
+#bmx6 #X#	iptables -A FORWARD -i icvpn -o bmx+ -d 10.200.0.0/15 -j ACCEPT
 
         #dns; da in nvram.conf der dns eingetragen ist und eine routing rule fuer dns erzeugt,
         #damit locale aufloesung geht, gibt es probleme wenn aus dem freifunk netz dns anfragen 
         #via gleichem dns server (wie in resolv.conf) kommen. diese werden von firewall geblockt.
         #erlaube dns anfragen via localem server
         iptables -A FORWARD -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
-        iptables -A FORWARD -i bmx+ -p udp --dport 53 -j ACCEPT
+        iptables -A FORWARD -i bat+ -p udp --dport 53 -j ACCEPT
 
 	#allow forward to openvpn tunnel 
 	iptables -A FORWARD -i $BACKBONE_DEV -o vpn+ -j ACCEPT
 	iptables -A FORWARD -i bat+ -o vpn+ -j ACCEPT
-	iptables -A FORWARD -i bmx+ -o vpn+ -j ACCEPT
+#bmx6	iptables -A FORWARD -i bmx+ -o vpn+ -j ACCEPT
 
 	#block any other
 	iptables -A FORWARD -j LOG --log-prefix "DROP IPv4 FORWARD: " 
