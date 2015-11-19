@@ -159,6 +159,12 @@ if [ "$1" = "start" ]; then
 #X#	iptables -A FORWARD -i icvpn -o $BACKBONE_DEV -d 10.200.0.0/15 -j ACCEPT
 #X#	iptables -A FORWARD -i icvpn -o bmx+ -d 10.200.0.0/15 -j ACCEPT
 
+        #dns; da in nvram.conf der dns eingetragen ist und eine routing rule fuer dns erzeugt,
+        #damit locale aufloesung geht, gibt es probleme wenn aus dem freifunk netz dns anfragen 
+        #via gleichem dns server (wie in resolv.conf) kommen. diese werden von firewall geblockt.
+        #erlaube dns anfragen via localem server
+        iptables -A FORWARD -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
+
 	#allow forward to openvpn tunnel 
 	iptables -A FORWARD -i $BACKBONE_DEV -o vpn+ -j ACCEPT
 	iptables -A FORWARD -i bat+ -o vpn+ -j ACCEPT
