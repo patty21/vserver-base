@@ -7,3 +7,5 @@ phpmyadmin
 post-cmd:chown -R www-data:www-data /usr/share/phpmyadmin
 #post-cmd:chmod -R 775 /usr/share/phpmyadmin/config
 
+# for normal installation, disable this service
+post-cmd:update-rc.d mysql disable
