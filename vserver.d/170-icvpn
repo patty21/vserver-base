@@ -1,6 +1,8 @@
-#installs quagga / bgp(stadtverbindungen über tincd)
+#installs quagga / bgp(stadtverbindungen Ã¼ber tincd)
 quagga
 post-cmd:chmod 640 /etc/quagga/zebra.conf
 post-cmd:chmod 640 /etc/quagga/bgpd.conf
 post-cmd:chown -R quagga:quagga /etc/quagga/*
 
+# for normal installation, disable this service
+post-cmd:update-rc.d quagga disable

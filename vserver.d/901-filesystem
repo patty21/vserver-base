@@ -7,6 +7,10 @@ post-cmd:mkdir -p /var/lib/freifunk
 post-cmd:chown root:root /etc/cron.d/freifunk
 post-cmd:chmod 644 /etc/cron.d/freifunk
 
+#correct some user rights for some linux installations on vserver
+post-cmd:chown root:syslog /var/log
+post-cmd:chown syslog:adm /var/log/syslog /var/log/kern.log /var/log/auth.log
+
 #change owner of source files before copying
 pre-cmd:chown -R root:root $1/etc
 
