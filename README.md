@@ -84,7 +84,7 @@ apt-⁠get install git
 git clone git@github.com:ddmesh/vserver-base.git
 cd freifunk-base
 ./⁠vserver-⁠install.sh
-</post>
+</pre>
 Es werden einige Pakete nachinstalliert, Files kopiert und am Ende noch einige Tools compiliert.
 Wenn das fertig ist, müssen Community-Spezifische Dinge angepasst werden:
 *ddmesh-ipcalc.sh
