@@ -78,7 +78,7 @@ cat<<EOM
 EOM
 			for iface in $(ip link show | sed -n '/^[0-9]\+:/s#^[0-9]\+:[ ]\+\(.*\):.*$#\1#p' | sed "/vpn/d;/lo/d;/bat/d")
 			do
-				echo "			\"traffic_$iface\": \"$(ifconfig $iface | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')\","
+				echo "			\"traffic_$iface\": \"$(cat /proc/net/dev | grep $iface: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')\","
 			done
 cat<<EOM
 $(cat /proc/meminfo | sed 's#\(.*\):[ 	]\+\([0-9]\+\)[ 	]*\(.*\)#\t\t\t\"meminfo_\1\" : \"\2\ \3\",#')
