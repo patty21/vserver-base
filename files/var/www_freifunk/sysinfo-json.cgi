@@ -12,10 +12,11 @@ eval $(ddmesh-ipcalc.sh -n $ddmesh_node)
 tunnel_info="$(sudo /usr/bin/freifunk-gateway-info.sh)"
 
 WLDEV=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
+WANDEV=$(nvram get ifname)
 
 cat << EOM
 {
- "version":"6",
+ "version":"7",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -62,6 +63,30 @@ $(cat /var/etc/resolv.conf.dynamic | sed -n '/nameserver[ 	]\+10\.200/{s#[ 	]*na
 			"email":"$(nvram get contact_email)",
 			"note":"$(nvram get contact_note)"
 		},
+		"backbone":{
+			"accept":[
+EOM
+			IFS='
+'
+			for i in $(nvram show 2>/dev/null | grep "^backbone_range_[0-9]" | sed 's#^.*=##')
+			do
+				IFS=' :'; set $i
+				start=$1
+				count=$2
+				end=$(($start+$count))
+				echo "				{\"first\":\"$start\",\"last\":\"$end\"},"
+			done 
+			IFS='
+'
+			for i in $(nvram show 2>/dev/null | grep "^backbone_accept_[0-9]" | sed 's#^.*=##')
+			do
+				IFS=' :'; set $i
+				echo "				{\"first\":\"$1\",\"last\":\"$1\"},"
+			done 
+			echo "				{\"first\":\"0\",\"last\":\"0\"}"
+cat << EOM
+			]
+		},
 EOM
 
 cat<<EOM
@@ -71,9 +96,12 @@ cat<<EOM
 			"dhcp_lease" : "0",
 			"traffic_adhoc": "",
 			"traffic_ap": "",
+			"traffic_wan": "$(ifconfig $WANDEV | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
 			"traffic_ovpn": "$(ifconfig vpn0 | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
 			"traffic_icvpn": "$(ifconfig icvpn | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
 EOM
+			IFS='
+'
 			for iface in $(ip link show | sed -n '/^[0-9]\+:/s#^[0-9]\+:[ ]\+\(.*\):.*$#\1#p' | sed "/vpn/d;/lo/d;/bat/d")
 			do
 				echo "			\"traffic_$iface\": \"$(ifconfig $iface | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')\","
@@ -94,9 +122,7 @@ cat<<EOM
 			"routing_tables":{
 				"route":{
 					"link":[
-$(ip route list table bat_route | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ],
-		  			"global":[
-$(ip route list table bat_route | sed  '/scope[ ]\+link/d;s#^\([0-9./]\+\)[	 ]\+via[	 ]\+\([0-9.]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","via":"\2","interface":"\3"},#p' | sed '$s#,[ 	]*$##') ]
+$(ip route list table bat_route | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ]
 	  		},
 			"hna":{
 				"link":[
