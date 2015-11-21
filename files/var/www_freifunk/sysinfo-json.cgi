@@ -73,7 +73,7 @@ EOM
 				IFS=' :'; set $i
 				start=$1
 				count=$2
-				end=$(($start+$count))
+				end=$(($start+$count-1))
 				echo "				{\"first\":\"$start\",\"last\":\"$end\"},"
 			done 
 			IFS='
@@ -83,7 +83,7 @@ EOM
 				IFS=' :'; set $i
 				echo "				{\"first\":\"$1\",\"last\":\"$1\"},"
 			done 
-			echo "				{\"first\":\"0\",\"last\":\"0\"}"
+			echo "				{\"first\":\"\",\"last\":\"\"}"
 cat << EOM
 			]
 		},
