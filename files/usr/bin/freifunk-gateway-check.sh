@@ -3,7 +3,7 @@
 
 ip_rule_priority=98
 ip_rule_priority_unreachable=99
-DEBUG=false
+DEBUG=true
 LOGGER_TAG="GW_CHECK"
 
 setup_gateway_table ()
@@ -187,7 +187,7 @@ if ! $ok; then
 	# try to restart openvpn, in case connection is dead, but active ($ok was true)
 	# also if no vpn was active ($ok was false)
 	#but only if no "no-ovpn-restart" was passed
-	if [ -z "$1" ]; then
+	if [ "$(nvram get ddmesh_disable_gateway)" = "0" -a -z "$1" ]; then
 		/etc/init.d/openvpn restart
 	fi
 fi
