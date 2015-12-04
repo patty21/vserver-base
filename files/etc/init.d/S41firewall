@@ -14,10 +14,111 @@ WAN_DEV=$(nvram get ifname)
 
 eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
 
+# http://www.thatsgeeky.com/2011/01/limiting-brute-force-attacks-with-  $IPT/
+# http://www.thatsgeeky.com/2011/02/escalating-consequences-with-       $IPT/
+
+# inhalt
+# cat /proc/net/xt_recent/*
+
+
+table=BRUTE_FORCE
+
+setup_brute_force() {
+
+	IPT=iptables
+	test "$1" = "ipv6" && IPT=ip6tables
+
+	$IPT -F $table 
+	$IPT -X $table
+	$IPT -N $table
+
+	$IPT -F ATTK_CHECK
+	$IPT -F ATTACKED
+	$IPT -X ATTK_CHECK
+	$IPT -X ATTACKED
+	$IPT -N ATTK_CHECK
+	$IPT -N ATTACKED
+
+	#brute force table in haupttabelle einbinden
+	$IPT -A INPUT -j $table
+
+	#####################################################
+	# accept established connections
+	#####################################################	
+	$IPT -A $table -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+	#####################################################
+	# pre checks
+	#####################################################
+	#einige laender verbieten (fuer aufbauende verbindungen, max 10 pro rule)
+#	$IPT -A $table  -m state --state NEW -m geoip --source-country CN,RU -j DROP
+#	$IPT -A $table  -p tcp --dport 22 -m state --state NEW -m geoip ! --source-country DE -m limit --limit 5/min -j LOG --log-prefix "DROP GEO: " 
+#	$IPT -A $table  -p tcp --dport 22 -m state --state NEW -m geoip ! --source-country DE -j DROP
+#	$IPT -A $table  -p tcp --dport 5000 -m state --state NEW -m geoip ! --source-country DE -m limit --limit 5/min -j LOG --log-prefix "DROP GEO: "
+#	$IPT -A $table  -p tcp --dport 5000 -m state --state NEW -m geoip ! --source-country DE -j DROP
+
+	#$IPT -A $table  -m state --state NEW -m geoip ! --source-country DE,FR,AT,CH,CZ,SK,PL,FI,NO,DK,SE,ES -j DROP
+	#$IPT -A $table  -m state --state NEW -m geoip ! --source-country SE,ES,GB,NL -j DROP
+
+	# ALWAYS allow ONLY from germany
+#	$IPT -A $table -p tcp --dport 22 -m state --state NEW -m geoip --source-country DE -j ACCEPT 
+#	$IPT -A $table -p tcp --dport 5000 -m state --state NEW -m geoip --source-country DE -j ACCEPT 
+
+
+	#####################################################
+	# still BANNED?
+	#####################################################
+	#alle die in resent-liste "BANNED" sind und nicht aelter als 1h aussperren
+	#gleichzeitig timestamp aktualisieren wenn ein packet vorher gesehen wird (timeout started von neuem)
+	$IPT -A $table -p tcp -m multiport --dports 22 -m recent --update --seconds 3600 --name BANNED --rsource -j DROP
+
+	#####################################################
+	# new paket recevied -> forward for checking (update statistik)
+	#####################################################
+	# ssh
+	$IPT -A $table -p tcp -m multiport --dports 22 -m state --state NEW -j ATTK_CHECK
+
+	#####################################################
+	# ~~~~ statistic rules ~~~~
+	#####################################################
+		#alle neuen pakete (initial) merken
+		$IPT -A ATTK_CHECK -m recent --set --name ATTK --rsource
+
+		# in 600s mehr als 16 versuche -> als Attacke behandeln
+		$IPT -A ATTK_CHECK -m recent --update --seconds 600 --hitcount 16 --name ATTK --rsource -j ATTACKED
+
+		# in 60 s mehr als 6 versuche -> als Attacke behandeln
+		$IPT -A ATTK_CHECK -m recent --update --seconds 60 --hitcount 6 --name ATTK --rsource -j ATTACKED
+
+			########################################################
+			# ~~~~ process ATTACK  ~~~~ -> BANNED resent-list; DROP
+			#######################################################
+
+			# logging attack (but limit logging)
+			$IPT -A ATTACKED -m limit --limit 5/min -j LOG --log-prefix "$IPT (Rule ATTACKED): " --log-level 7
+
+			# paket BANNED: 1. remember in BANNED resent-list (processed/updated at beginning)
+			#               2. drop paket
+			$IPT -A ATTACKED -m recent --set --name BANNED --rsource -j DROP
+
+		#####################################################
+		# ~~~~ paket (still) valid ~~~~ -> ACCEPT
+		####################################################
+		$IPT -A ATTK_CHECK -j RETURN
+
+		#####################################################
+		# accept pakets that I have checked
+		####################################################
+		$IPT -A INPUT -p tcp -m multiport --dports 22 -j ACCEPT
+
+}
+
+
 
 if [ "$1" = "start" ]; then
 
-   	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+    #iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+    setup_brute_force ipv4
 
     iptables -N T_BACKBONE_I
 
@@ -58,10 +159,7 @@ if [ "$1" = "start" ]; then
 
 	#accept answers
 	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-	
-    	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-
-    	iptables -A INPUT -j T_BACKBONE_I
+	iptables -A INPUT -j T_BACKBONE_I
 	
 	#allow access only some services 
 	iptables -A INPUT -p icmp -j ACCEPT
@@ -69,9 +167,13 @@ if [ "$1" = "start" ]; then
 	iptables -A INPUT -p udp --dport 30000:50000 -j ACCEPT
 	iptables -A INPUT -i lo -j ACCEPT
 	iptables -A INPUT -p TCP --dport 80 -j ACCEPT
+#	iptables -A INPUT -p TCP --dport 8080 -j ACCEPT
 	iptables -A INPUT -p TCP --dport 443 -j ACCEPT
 #	iptables -A INPUT -p TCP --dport 22 -j ACCEPT
 	#iptables -A INPUT -d 224.0.0.0/4 -j ACCEPT
+
+	#rsyslog freifunk knoten
+	#iptables -A INPUT -s 10.200.0.0/15 -d 10.200.0.0/15 -p udp --dport 514 -j ACCEPT
 
 	#time service (inetd) for rdate (SNTP)
 #X#	iptables -A INPUT -p TCP --dport 37 -j ACCEPT
@@ -83,9 +185,9 @@ if [ "$1" = "start" ]; then
 
  	#smtp for incomming emails (from other mail server or from email clients)
 	#SMTP - port 25
-	iptables -A INPUT -p tcp --dport 25 -j ACCEPT
+#	iptables -A INPUT -p tcp --dport 25 -j ACCEPT
 	#IMAP - port 143
-	iptables -A INPUT -p tcp --dport 143 -j ACCEPT
+#	iptables -A INPUT -p tcp --dport 143 -j ACCEPT
 
 	iptables -A INPUT -i bmx_prime -j ACCEPT
 
@@ -158,12 +260,12 @@ if [ "$1" = "start" ]; then
 #X#	iptables -A FORWARD -i icvpn -o $BACKBONE_DEV -d 10.200.0.0/15 -j ACCEPT
 #bmx6 #X#	iptables -A FORWARD -i icvpn -o bmx+ -d 10.200.0.0/15 -j ACCEPT
 
-        #dns; da in nvram.conf der dns eingetragen ist und eine routing rule fuer dns erzeugt,
-        #damit locale aufloesung geht, gibt es probleme wenn aus dem freifunk netz dns anfragen 
-        #via gleichem dns server (wie in resolv.conf) kommen. diese werden von firewall geblockt.
-        #erlaube dns anfragen via localem server
-        iptables -A FORWARD -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
-        iptables -A FORWARD -i bat+ -p udp --dport 53 -j ACCEPT
+	#dns; da in nvram.conf der dns eingetragen ist und eine routing rule fuer dns erzeugt,
+	#damit locale aufloesung geht, gibt es probleme wenn aus dem freifunk netz dns anfragen 
+	#via gleichem dns server (wie in resolv.conf) kommen. diese werden von firewall geblockt.
+	#erlaube dns anfragen via localem server
+	iptables -A FORWARD -i $BACKBONE_DEV -p udp --dport 53 -j ACCEPT
+	iptables -A FORWARD -i bat+ -p udp --dport 53 -j ACCEPT
 
 	#allow forward to openvpn tunnel 
 	iptables -A FORWARD -i $BACKBONE_DEV -o vpn+ -j ACCEPT

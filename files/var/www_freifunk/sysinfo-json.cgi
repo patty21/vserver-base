@@ -3,8 +3,6 @@
 echo 'Content-type: text/plain txt'
 echo ''
 
-LOCK=/tmp/sysinfo.lock
-lock $LOCK
 
 BMXD_DB_PATH=/var/lib/freifunk/bmxd
 ddmesh_node=$(nvram get ddmesh_node)
@@ -14,10 +12,11 @@ eval $(ddmesh-ipcalc.sh -n $ddmesh_node)
 tunnel_info="$(sudo /usr/bin/freifunk-gateway-info.sh)"
 
 WLDEV=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
+WANDEV=$(nvram get ifname)
 
 cat << EOM
 {
- "version":"6",
+ "version":"7",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -64,6 +63,30 @@ $(cat /var/etc/resolv.conf.dynamic | sed -n '/nameserver[ 	]\+10\.200/{s#[ 	]*na
 			"email":"$(nvram get contact_email)",
 			"note":"$(nvram get contact_note)"
 		},
+		"backbone":{
+			"accept":[
+EOM
+			IFS='
+'
+			for i in $(nvram show 2>/dev/null | grep "^backbone_range_[0-9]" | sed 's#^.*=##')
+			do
+				IFS=' :'; set $i
+				start=$1
+				count=$2
+				end=$(($start+$count-1))
+				echo "				{\"first\":\"$start\",\"last\":\"$end\"},"
+			done 
+			IFS='
+'
+			for i in $(nvram show 2>/dev/null | grep "^backbone_accept_[0-9]" | sed 's#^.*=##')
+			do
+				IFS=' :'; set $i
+				echo "				{\"first\":\"$1\",\"last\":\"$1\"},"
+			done 
+			echo "				{\"first\":\"\",\"last\":\"\"}"
+cat << EOM
+			]
+		},
 EOM
 
 cat<<EOM
@@ -73,9 +96,12 @@ cat<<EOM
 			"dhcp_lease" : "0",
 			"traffic_adhoc": "",
 			"traffic_ap": "",
+			"traffic_wan": "$(cat /proc/net/dev | grep $WANDEV: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
 			"traffic_ovpn": "$(cat /proc/net/dev | grep vpn0: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
 			"traffic_icvpn": "$(cat /proc/net/dev | grep icvpn: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
 EOM
+			IFS='
+'
 			for iface in $(ip link show | sed -n '/^[0-9]\+:/s#^[0-9]\+:[ ]\+\(.*\):.*$#\1#p' | sed "/vpn/d;/lo/d;/bat/d")
 			do
 				echo "			\"traffic_$iface\": \"$(cat /proc/net/dev | grep $iface: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')\","
@@ -96,9 +122,7 @@ cat<<EOM
 			"routing_tables":{
 				"route":{
 					"link":[
-$(ip route list table bat_route | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ],
-		  			"global":[
-$(ip route list table bat_route | sed  '/scope[ ]\+link/d;s#^\([0-9./]\+\)[	 ]\+via[	 ]\+\([0-9.]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","via":"\2","interface":"\3"},#p' | sed '$s#,[ 	]*$##') ]
+$(ip route list table bat_route | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ]
 	  		},
 			"hna":{
 				"link":[
@@ -146,5 +170,4 @@ cat << EOM
 }
 EOM
 
-lock -u $LOCK
 

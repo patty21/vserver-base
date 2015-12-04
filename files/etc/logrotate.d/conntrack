@@ -1,0 +1,11 @@
+# logrotate fuer logging conntract settings and current value
+# /usr/bin/conntrack.sh
+
+/var/log/conntrack.log {
+        rotate 15 
+        daily
+        compress
+        copytruncate
+        missingok
+}
+

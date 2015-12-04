@@ -98,8 +98,28 @@ setup_routing() {
 }
 
 
+set_conntrack() {
+
+	#increment nf_conntrack_max from about 31000-65535 (depending on vserver provider)
+	#ispone has a small value of 31000 and this will lead to ignoring any network packets
+	#ispone koennte evt diesen wert runter setzen, damit der server online erscheint aber nichts mehr macht.
+	#aber das ist nicht sicher.
+	#daher habe ich einen cron job aufgesetzt, der die aktuellen conntrack werte alle 5 min loggt.
+	#http://pc-freak.net/blog/resolving-nf_conntrack-table-full-dropping-packet-flood-message-in-dmesg-linux-kernel-log/
+	#oder auch im git-repo: administration/documentation/nf_conntrack.html
+
+	#erhoehe conntrack werte und die hash tabelle, welche die connections speichert
+	/sbin/sysctl -w net.netfilter.nf_conntrack_max=131072
+	/sbin/sysctl -p
+
+	#die werte fuer die hash tabelle
+	echo 32768 > /sys/module/nf_conntrack/parameters/hashsize 
+
+}
+
 case "$1" in
   start)
+	set_conntrack
     	setup_routing add
     	;;
   stop)
