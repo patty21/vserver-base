@@ -159,10 +159,10 @@ if [ "$1" = "start" ]; then
 
 	#accept answers
 	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A INPUT -p icmp -j ACCEPT
 	iptables -A INPUT -j T_BACKBONE_I
 	
 	#allow access only some services 
-	iptables -A INPUT -p icmp -j ACCEPT
 	#tracepath/route
 	iptables -A INPUT -p udp --dport 30000:50000 -j ACCEPT
 	iptables -A INPUT -i lo -j ACCEPT
@@ -246,6 +246,7 @@ if [ "$1" = "start" ]; then
 	echo "setting up FORWARD rules ..."
 
 	iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A FORWARD -p icmp -j ACCEPT
 
 	iptables -A FORWARD -i $BACKBONE_DEV -o $BACKBONE_DEV -j ACCEPT
 #bmx6	iptables -A FORWARD -i $BACKBONE_DEV -o bmx+ -j ACCEPT

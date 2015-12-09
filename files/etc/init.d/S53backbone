@@ -68,6 +68,7 @@ $1 {
 EOM
 	echo "program /sbin/ip \"link set %% down\" wait;" >>$CONF
 	echo "program /sbin/ip \"link set %% promisc on\" wait;" >>$CONF
+	echo "program /sbin/ip \"link set %% multicast off mtu 1448\" wait;" >>$CONF
  	echo "program /sbin/ip \"addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev %%\" wait;" >>$CONF
 	echo "program /sbin/ip \"link set %% up\" wait;" >>$CONF
 	echo "program /etc/init.d/S52batmand \"addif %%\" wait;" >>$CONF
