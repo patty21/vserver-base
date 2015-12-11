@@ -1,0 +1,11 @@
+*~
+*.o
+compiled-tools/bmx/bmxd/bmxd
+compiled-tools/fastd/fastd-16/
+compiled-tools/fastd/libuecc-4/
+compiled-tools/json/jshn
+compiled-tools/mynuttcp/nuttcp-6.1.2*
+compiled-tools/myvtun/vtun-3.0.3/
+compiled-tools/qrencode/qrencode-3.4.2/
+compiled-tools/tinc-1.1pre10/tinc-1.1pre10/
+

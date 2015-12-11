@@ -96,15 +96,15 @@ cat<<EOM
 			"dhcp_lease" : "0",
 			"traffic_adhoc": "",
 			"traffic_ap": "",
-			"traffic_wan": "$(ifconfig $WANDEV | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
-			"traffic_ovpn": "$(ifconfig vpn0 | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
-			"traffic_icvpn": "$(ifconfig icvpn | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')",
+			"traffic_wan": "$(cat /proc/net/dev | grep $WANDEV: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
+			"traffic_ovpn": "$(cat /proc/net/dev | grep vpn0: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
+			"traffic_icvpn": "$(cat /proc/net/dev | grep icvpn: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
 EOM
 			IFS='
 '
 			for iface in $(ip link show | sed -n '/^[0-9]\+:/s#^[0-9]\+:[ ]\+\(.*\):.*$#\1#p' | sed "/vpn/d;/lo/d;/bat/d")
 			do
-				echo "			\"traffic_$iface\": \"$(ifconfig $iface | sed -n '/RX bytes/{s#[ ]*RX bytes:\([0-9]\+\)[^:]\+:\([0-9]\+\).*#\1,\2#;p}')\","
+				echo "			\"traffic_$iface\": \"$(cat /proc/net/dev | grep $iface: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')\","
 			done
 cat<<EOM
 $(cat /proc/meminfo | sed 's#\(.*\):[ 	]\+\([0-9]\+\)[ 	]*\(.*\)#\t\t\t\"meminfo_\1\" : \"\2\ \3\",#')
