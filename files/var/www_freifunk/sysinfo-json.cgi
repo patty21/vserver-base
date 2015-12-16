@@ -16,7 +16,7 @@ WANDEV=$(nvram get ifname)
 
 cat << EOM
 {
- "version":"7",
+ "version":"8",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -123,12 +123,12 @@ cat<<EOM
 				"route":{
 					"link":[
 $(ip route list table bat_route | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ]
-	  		},
-			"hna":{
-				"link":[
-$(ip route list table bat_hna | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ],
+	  			},
+				"hna":{
+					"link":[
+$(ip route list table bat_hna | sed -n '/scope[ ]\+link/{s#^\([0-9./]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","interface":"\2"},#;p}' | sed '$s#,[ 	]*$##') ],
 		  		"global":[
-$(ip route list table bat_hna | sed -n '/scope[ ]\+link/d;s#^\([0-9./]\+\)[	 ]\+via[	 ]\+\([0-9.]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t{"target":"\1","via":"\2","interface":"\3"},#p' | sed '$s#,[ 	]*$##') ]
+$(ip route list table bat_hna | sed -n '/scope[ ]\+link/d;s#^\([0-9./]\+\)[	 ]\+via[	 ]\+\([0-9.]\+\)[	 ]\+dev[	 ]\+\([^	 ]\+\).*#\t\t\t\t\t\t{"target":"\1","via":"\2","interface":"\3"},#p' | sed '$s#,[ 	]*$##') ]
 				}
 			},
 			"gateways":{
