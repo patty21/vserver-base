@@ -14,6 +14,13 @@ post-cmd:chown syslog:adm /var/log/syslog /var/log/kern.log /var/log/auth.log
 #change owner of source files before copying
 pre-cmd:chown -R root:root $1/etc
 
+#setup log directories
+pre-cmd:mkdir -p /var/log/freifunk
+pre-cmd:mkdir -p /var/log/freifunk/register
+pre-cmd:mkdir -p /var/log/freifunk/router
+pre-cmd:chown root:syslog /var/log/freifunk
+pre-cmd:chown www-data:www-data /var/log/freifunk/registrator
+pre-cmd:chown syslog:syslog /var/log/freifunk/router
 
 #setup init.d scripts
 post-cmd:update-rc.d S40network defaults

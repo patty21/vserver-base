@@ -1,0 +1,9 @@
+# http://www.tecmint.com/monitorix-a-lightweight-system-and-network-monitoring-tool-for-linux/
+# fuer monitorix, einem system ueberwachungs tool mit rrd grafic und webserver
+
+pre-cmd:echo "deb http://apt.izzysoft.de/ubuntu generic universe" >> /etc/apt/sources.list
+pre-cmd:wget -O /tmp/izzysoft.asc http://apt.izzysoft.de/izzysoft.asc
+pre-cmd:apt-key add /tmp/izzysoft.asc
+pre-cmd:apt-get update
+pre-cmd:apt-get install monitorix 
+

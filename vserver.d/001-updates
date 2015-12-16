@@ -8,5 +8,5 @@ unattended-upgrades
 post-cmd:dpkg-reconfigure unattended-upgrades
 post-cmd:service unattended-upgrades stop
 post-cmd:service unattended-upgrades start
-
+post-cmd:update-rc.d unattended-upgrades defaults
 
