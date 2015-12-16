@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#commands $1: pre-up, up, down, post-down, connect, establish, disestablish, verify
+#commands $1: up, down, connect, establish, disestablish, verify
 
 #environment variables for valid for all commands
 # FASTD_PID: fastd’s PID
@@ -21,6 +21,7 @@
 # when command returns 0 then this connection is accepted (default not)
 # evt kann ich dadurch jede verbindung zum testen erlauben
 
+false && {
 cat <<EOM >>/tmp/fastd-cmd-env.log
 ---------------------------------------
 command: $1
@@ -38,6 +39,7 @@ PEER_NAME: $PEER_NAME
 PEER_KEY: $PEER_KEY
 
 EOM
+}
 
 eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
 
@@ -46,6 +48,7 @@ case $1 in
  up)
   /sbin/ip link set $INTERFACE down
   /sbin/ip link set $INTERFACE promisc off
+  /sbin/ip link set $INTERFACE multicast off mtu $INTERFACE_MTU
   /sbin/ip addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $INTERFACE
   /sbin/ip link set $INTERFACE up
   /etc/init.d/S52batmand addif $INTERFACE
