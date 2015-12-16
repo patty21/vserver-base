@@ -5,18 +5,34 @@
 # fastd + libuecc
 # https://projects.universe-factory.net/projects/fastd/wiki/Building
 # https://projects.universe-factory.net/projects/fastd/files
-# http://fastd.readthedocs.org/en/v16/index.html
+#
+# git: fastd
+# http://git.universe-factory.net/fastd/
+# git: libuecc
+# http://git.universe-factory.net/libuecc/
 #
 # nacl: crypt lib wird dazugelinkt (keine shared lib)
 # apt-get install libnacl-dev
 
+#git
+fastd_rev=281fbb005702da662e1658cb1bb4135f66a447bf
+libuecc_rev=bb4fcb93282ca2c3440294683c88e8d54a1278e0
+
 build_libuecc()
-{	
+{
+		
 	# make sub shell to avoid extra calles to cd ..
 	(
-		rm -rf libuecc-4
-		tar xzf libuecc-4.tar.gz
-		cd libuecc-4
+		rm -rf libuecc
+		if [ -f libuecc-$libuecc_rev ]; then
+			tar xzf libuecc-$libuecc_rev
+		else
+			git clone git://git.universe-factory.net/libuecc
+			git checkout $libuecc_rev
+			rev=$(git -C libuecc log -1 | sed -n '/^commit/s#commit ##p')
+			tar czf libuecc-$rev.tgz libuecc
+		fi
+		cd libuecc
 		mkdir build
 		cd build
 		cmake ..
@@ -53,12 +69,19 @@ build_fastd()
 		-DENABLE_LIBSODIUM:BOOL=FALSE \
 		-DENABLE_LTO:BOOL=TRUE"
 
-		rm -rf fastd-16
-		tar xzf fastd-16.tar.gz
+		rm -rf fastd
+		if [ -f fastd-$fastd_rev ]; then
+			tar xzf fastd-$fastd_rev
+		else
+			git clone git://git.universe-factory.net/fastd
+			git checout $fastd_rev
+			rev=$(git -C fastd log -1 | sed -n '/^commit/s#commit ##p')
+			tar czf fastd-$rev.tgz fastd
+		fi
 	
-		patch --directory=fastd-16 -p0 < urandom.patch
+		patch --directory=fastd -p0 < urandom.patch
 	
-		cd fastd-16
+		cd fastd
 		mkdir build
 		cd build
 		cmake $CMAKE_OPTIONS ..
