@@ -5,6 +5,9 @@ echo ''
 
 
 BMXD_DB_PATH=/var/lib/freifunk/bmxd
+mkdir -p /var/statistic/
+touch /var/statistic/gateway_usage
+
 ddmesh_node=$(nvram get ddmesh_node)
 test -z "$ddmesh_node" && exit
 
