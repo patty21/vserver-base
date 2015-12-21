@@ -229,8 +229,9 @@ if [ "$1" = "start" ]; then
 	iptables -A INPUT -i $WAN_DEV -p tcp --dport 5000 -j ACCEPT
 	iptables -A INPUT -i $WAN_DEV -p udp --dport 5000 -j ACCEPT
 	
-#some portforwarding
-#iptables -t nat -I PREROUTING -p tcp --dport 81 -j DNAT --to-destination 37.120.169.24:5000
+#some portforwarding backbone alternativ port
+#	ipadd=$(ip addr show dev $(nvram get ifname) | sed -n '/[ 	]\+inet[ 	]\+/s#[ 	]\+inet[ 	]\+\([0-9.]\+\).*#\1#p')
+#	iptables -t nat -I PREROUTING -i $WAN_DEV -p tcp --dport 443 -j DNAT --to-destination $ipaddr:5000
 
 	#icvpn tunnel
 #X#	iptables -A INPUT -i $WAN_DEV -p tcp --dport 656 -j ACCEPT
