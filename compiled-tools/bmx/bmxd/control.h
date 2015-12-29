@@ -17,6 +17,8 @@
  *
  */
 
+#include "objlist.h"
+#include "list-batman.h"
 
 #define MIN_UPTIME 0
 #define MAX_UPTIME 2147383 /*(((TP32/1000)/2)-100) /1000 to talk about seconds and not ms, /2 to not render scheduled events outdated, -100 to be save */
@@ -49,7 +51,6 @@ typedef uint64_t batman_time_t;
 
 extern int unix_sock;
 
-extern struct list_head_first ctrl_list;
 
 #define ARG_PEDANTIC_CMDCHECK "pedantic_cmd_check"
 
@@ -74,7 +75,7 @@ enum {
 
 struct ctrl_node
 {
-	struct list_head list;
+	LIST_ENTRY entry;
 	int fd;
 	void (*cn_fd_handler) (struct ctrl_node *);
     batman_time_t closing_stamp;
@@ -82,15 +83,15 @@ struct ctrl_node
 	int8_t dbgl;
 };
 
-extern struct list_head_first dbgl_clients[DBGL_MAX+1];
+extern LIST_ENTRY ctrl_list;
 
 struct dbgl_node
 {
-	struct list_head list;
+	LIST_ENTRY entry;
 	struct ctrl_node *cn;
 };
 
-
+extern LIST_ENTRY dbgl_clients[];
 
 // muting does not help if a changing value like time or seqno occurs durig the first DBG_HIST_TEXT_SIZE bytes
 #define DBG_HIST_TEXT_SIZE 80 
@@ -115,11 +116,11 @@ struct dbg_histogram {
 #ifdef  NODEBUGALL
 #define dbgf_all(...) {;}
 #else
-#define dbgf_all( dbgt, ... ); do { if ( __dbgf_all() ) { _dbgf_all( dbgt, __FUNCTION__, __VA_ARGS__ ); } } while (0)
+#define dbgf_all( dbgt, ... ) do { if ( __dbgf_all() ) { _dbgf_all( dbgt, __FUNCTION__, __VA_ARGS__ ); } } while (0)
 #endif
 
 #ifdef EXTDEBUG
-#define dbgf_ext( dbgt, ... ); do { if ( __dbgf_all() ) { _dbgf_all( dbgt, __FUNCTION__, __VA_ARGS__ ); } } while (0)
+#define dbgf_ext( dbgt, ... ) do { if ( __dbgf_all() ) { _dbgf_all( dbgt, __FUNCTION__, __VA_ARGS__ ); } } while (0)
 #else
 #define dbgf_ext(...) {;}
 #endif

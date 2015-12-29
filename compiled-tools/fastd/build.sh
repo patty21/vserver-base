@@ -15,7 +15,7 @@
 # apt-get install libnacl-dev
 
 #git
-fastd_rev=281fbb005702da662e1658cb1bb4135f66a447bf
+fastd_rev=0358cbf937ee73447970546290a01f82c450dab9
 libuecc_rev=bb4fcb93282ca2c3440294683c88e8d54a1278e0
 
 build_libuecc()
@@ -24,8 +24,8 @@ build_libuecc()
 	# make sub shell to avoid extra calles to cd ..
 	(
 		rm -rf libuecc
-		if [ -f libuecc-$libuecc_rev ]; then
-			tar xzf libuecc-$libuecc_rev
+		if [ -f libuecc-$libuecc_rev.tgz ]; then
+			tar xzf libuecc-$libuecc_rev.tgz
 		else
 			git clone git://git.universe-factory.net/libuecc
 			git checkout $libuecc_rev
@@ -52,7 +52,7 @@ build_fastd()
 		-DWITH_METHOD_COMPOSED_GMAC:BOOL=FALSE \
 		-DWITH_METHOD_GENERIC_GMAC:BOOL=FALSE \
 		-DWITH_METHOD_GENERIC_POLY1305:BOOL=FALSE \
-		-DWITH_METHOD_NULL:BOOL=FALSE \
+		-DWITH_METHOD_NULL:BOOL=TRUE \
 		-DWITH_METHOD_XSALSA20_POLY1305:BOOL=FALSE \
 		-DWITH_CIPHER_AES128_CTR:BOOL=FALSE \
 		-DWITH_CIPHER_NULL:BOOL=TRUE \
@@ -70,11 +70,11 @@ build_fastd()
 		-DENABLE_LTO:BOOL=TRUE"
 
 		rm -rf fastd
-		if [ -f fastd-$fastd_rev ]; then
-			tar xzf fastd-$fastd_rev
+		if [ -f fastd-$fastd_rev.tgz ]; then
+			tar xzf fastd-$fastd_rev.tgz
 		else
 			git clone git://git.universe-factory.net/fastd
-			git checout $fastd_rev
+			git checkout $fastd_rev
 			rev=$(git -C fastd log -1 | sed -n '/^commit/s#commit ##p')
 			tar czf fastd-$rev.tgz fastd
 		fi

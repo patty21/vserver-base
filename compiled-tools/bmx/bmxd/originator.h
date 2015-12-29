@@ -109,6 +109,18 @@ extern int32_t dad_to;
 #define MAX_ASOCIAL YES
 #define DEF_ASOCIAL NO
 
+#define MIN_MESH_NET_ID 0x00000000
+#define MAX_MESH_NET_ID 0x00ffffff
+#define DEF_MESH_NET_ID 0x00000000      //connects to bmxd with protocol version 10
+#define GET_MESH_NET_TTL(id) (((id) >> 24) & 0xff )
+#define SET_MESH_NET_TTL(id) (((id) << 24) & 0xff000000 )
+#define GET_MESH_NET_ID(id)  ((id) & 0x00ffffff )
+
+extern int32_t meshNetworkId;           //command line parameter
+extern int32_t meshNetworkIdPreferred;  //command line parameter
+extern uint32_t meshNetworkIdSelected;   //internal selected id
+
+
 #define DEF_TTL 50                /* Time To Live of OGM broadcast messages */
 #define MAX_TTL 63
 #define MIN_TTL 1
@@ -147,7 +159,7 @@ extern uint32_t primary_addr;
 //extern struct hashtable_t *orig_hash;
 extern struct avl_tree orig_avl;
 
-extern struct list_head_first if_list;
+extern LIST_ENTRY if_list;
 
 extern struct list_head_first link_list;
 extern struct avl_tree link_avl;

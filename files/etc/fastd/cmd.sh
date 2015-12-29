@@ -51,15 +51,33 @@ case $1 in
   /sbin/ip link set $INTERFACE multicast off mtu $INTERFACE_MTU
   /sbin/ip addr add $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $INTERFACE
   /sbin/ip link set $INTERFACE up
-  /etc/init.d/S52batmand addif $INTERFACE
  ;;
 
  down)
-  /etc/init.d/S52batmand delif $INTERFACE
   /sbin/ip link set $INTERFACE down
   /sbin/ip addr del $_ddmesh_nonprimary_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $INTERFACE
  ;;
 
+ establish)
+	mkdir -p /var/backbone_status
+	touch /var/backbone_status/$PEER_KEY
+ ;;
+
+ disestablish)
+	rm -f /var/backbone_status/$PEER_KEY
+ ;;
+
+
+ verify)
+ 	#if verify-cmd was registerred in fastd.conf
+
+	logger -t fastd "allow connection from $PEER_ADDRESS:$PEER_PORT key $PEER_KEY"
+
+	# "learn" client. add config to peer directory
+	/etc/init.d/S53backbone-fastd add_accept $PEER_KEY "$(date) - client learned: peer_address [$PEER_ADDRESS]" 
+
+	exit 0;
+	;;
 
 esac
 

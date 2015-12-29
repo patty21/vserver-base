@@ -1,0 +1,7 @@
+
+#add main freifunk user. because some scripts are run as user "freifunk"
+post-cmd:adduser --shell /bin/bash --disabled-login --disabled-password --system --group --no-create-home freifunk 
+
+#allow user freifunk access www-data files
+post-cmd:usermod -a -G www-data freifunk
+

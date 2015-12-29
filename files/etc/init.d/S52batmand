@@ -43,13 +43,14 @@ echo "$PREFERED_GATEWAY"
 # 127er IP would be broadcasted
 
 PRIMARY_IF="bmx_prime"
+FASTD_IF="tbb_fastd"
 if [ "$1" = "start" ]; then
 	#ip link add link lo name $PRIMARY_IF type bridge
 	ip tuntap add dev $PRIMARY_IF mod tun
 	ip addr add $_ddmesh_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $PRIMARY_IF 
 	ip link set dev $PRIMARY_IF up
 fi
-_IF="dev=$PRIMARY_IF /linklayer 0"
+_IF="dev=$PRIMARY_IF /linklayer 0 dev=$FASTD_IF /linklayer 1"
 
 #add pending interfaces
 p=$(pwd)
@@ -59,17 +60,6 @@ do
 	_IF="$_IF dev=$i"
 done
 cd $p
-
-##add all possible tbb interfaces
-#i=0;
-#while [ $i -lt "$NUMBER_OF_CLIENTS" ]
-#do
-#        _IF="$_IF dev=tbb$i"
-#        i=$((i+1))
-#done
-
-#echo "interfaces: $_IF"
-
 
 #default start with no gatway.will be updated by gateway_check.sh
 # (register,info,...).ddmesh.de MUSS per hna mitgeteilt werden, da sonst der linux kernel irgendwie packete verwirft, die ein zweitesmal durch laufen
@@ -94,6 +84,8 @@ case "$ARG1" in
   stop)
 	echo "Stopping $DAEMON: "
 	killall -9 $DAEMON
+	ip link set dev $PRIMARY_IF down 
+	ip addr del $_ddmesh_ip/$_ddmesh_netpre broadcast $_ddmesh_broadcast dev $PRIMARY_IF
 	;;
 
   restart|force-reload)

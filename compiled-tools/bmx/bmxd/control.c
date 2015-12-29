@@ -39,6 +39,7 @@
 #include "metrics.h"
 #include "plugin.h"
 #include "schedule.h"
+#include "objlist.h"
 
 static char run_dir[MAX_PATH_SIZE] = DEF_RUN_DIR;
 
@@ -60,9 +61,9 @@ static int32_t pedantic_check = DEF_PEDANT_CHK;
 
 int unix_sock = 0;
 
-SIMPEL_LIST( ctrl_list );
+LIST_ENTRY ctrl_list;
 
-struct list_head_first dbgl_clients[DBGL_MAX+1];
+LIST_ENTRY dbgl_clients[DBGL_MAX+1];
 static struct dbg_histogram dbgl_history[2][DBG_HIST_SIZE];
 
 static uint8_t debug_system_active = NO;
@@ -85,27 +86,20 @@ int32_t Client_mode = NO; //this one must be initialized manually!
 static void remove_dbgl_node( struct ctrl_node *cn ) {	
 	
 	int8_t i;
-	struct dbgl_node *dn;
-	struct list_head *list_pos, *list_tmp, *list_prev;
 	
-	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ ) {
-
-		list_prev = (struct list_head *)&dbgl_clients[i];
-		
-		list_for_each_safe( list_pos, list_tmp, (struct list_head *)&dbgl_clients[i] ) {
-
-			dn = list_entry(list_pos, struct dbgl_node, list);
-
-			if ( dn->cn == cn ) {
-				list_del( list_prev, list_pos, &dbgl_clients[i] );
-				debugFree( list_pos, 1218 );
-			} else {
-				list_prev = &dn->list;
+	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ )
+	{
+		OLForEach(pEntry, LIST_ENTRY, dbgl_clients[i])
+		{
+			if( ((struct dbgl_node*)pEntry)->cn == cn )
+			{
+				OLRemoveEntryList(pEntry);
+				debugFree(pEntry, 218);
+				cn->dbgl = DBGL_UNUSED;
+				break;
 			}
 		}
 	}
-	
-	cn->dbgl = -1;
 }
 
 
@@ -115,13 +109,11 @@ static void add_dbgl_node( struct ctrl_node *cn, int dbgl ) {
 		return;
 	
 	struct dbgl_node *dn = debugMalloc( sizeof( struct dbgl_node ), 218 );
-	memset( dn, 0, sizeof( struct dbgl_node ) );
-	INIT_LIST_HEAD( &dn->list );
 	
 	dn->cn = cn;
 	cn->dbgl = dbgl;
-	list_add_tail( &dn->list, &dbgl_clients[dbgl] );
-	
+	OLInsertTailList(&dbgl_clients[dbgl], (PLIST_ENTRY)dn);
+
 	if ( dbgl == DBGL_SYS || dbgl == DBGL_CHANGES ) {
 		dbg( DBGL_CHANGES, DBGT_INFO, "resetting muted dbg history" );
 		memset( dbgl_history, 0, sizeof( dbgl_history ) );
@@ -231,7 +223,7 @@ static void activate_debug_system( void ) {
 		dbg( DBGL_CHANGES, DBGT_INFO, "BMX %s%s (compatibility version %d): %s",
 		     SOURCE_VERSION,
 		     strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "",
-		     COMPAT_VERSION, init_string);
+				 COMPAT_VERSION_X, init_string);
 		
 	}
 }
@@ -240,12 +232,11 @@ struct ctrl_node *create_ctrl_node( int fd, void (*cn_fd_handler) (struct ctrl_n
 	
 	struct ctrl_node *cn = debugMalloc( sizeof(struct ctrl_node), 201 );
 	memset( cn, 0, sizeof(struct ctrl_node) );
-	INIT_LIST_HEAD( &cn->list );
-	list_add_tail( &cn->list, &ctrl_list );
+	OLInsertTailList(&ctrl_list, &(cn->entry));
 	
 	cn->fd = fd;
 	cn->cn_fd_handler = cn_fd_handler;
-	cn->dbgl = -1;
+	cn->dbgl = DBGL_INVALID;
 	cn->authorized = authorized;
 	
 	return cn;
@@ -254,14 +245,8 @@ struct ctrl_node *create_ctrl_node( int fd, void (*cn_fd_handler) (struct ctrl_n
 
 void close_ctrl_node( uint8_t cmd, struct ctrl_node *ctrl_node ) {
 
-	struct list_head* list_pos, *list_prev, *list_tmp;
-
-	list_prev = (struct list_head *)&ctrl_list;
-	
-	list_for_each_safe( list_pos, list_tmp, &ctrl_list ) {
-
-		struct ctrl_node *cn = list_entry(list_pos, struct ctrl_node, list);
-		
+	OLForEach(cn, struct ctrl_node, ctrl_list)
+	{
 		if ( ( cmd == CTRL_CLOSE_ERROR || cmd == CTRL_CLOSE_SUCCESS || cmd == CTRL_CLOSE_DELAY )  &&  cn == ctrl_node ) {
 			
 			if ( cn->fd > 0  &&  cn->fd != STDOUT_FILENO ) {
@@ -302,13 +287,10 @@ void close_ctrl_node( uint8_t cmd, struct ctrl_node *ctrl_node ) {
 				change_selects();
 			}
 			
-			list_del( list_prev, list_pos, &ctrl_list );
+			OLRemoveEntryList(&(cn->entry));
 			debugFree( cn, 1201 );
-			
-		} else {
-			
-			list_prev = (struct list_head *)&cn->list;
-
+			//restart from list start
+			cn = (struct ctrl_node*) &ctrl_list;
 		}
 	}
 }
@@ -516,8 +498,6 @@ static void debug_output ( uint32_t check_len, uint32_t expire, struct ctrl_node
 	
 	static uint16_t dbgl_all_msg_num = 0;
 	static char *dbgt2str[] = {"", "INFO  ", "WARN  ", "ERROR "};
-	
-	struct list_head *list_pos;
 	int16_t dbgl_out[DBGL_MAX+1];
 	int i = 0, j;
 	
@@ -543,27 +523,27 @@ static void debug_output ( uint32_t check_len, uint32_t expire, struct ctrl_node
 	
 	if ( dbgl == DBGL_ALL ) {
 	
-		if ( !list_empty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
+		if ( !OLIsListEmpty(&dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
 	
 	} else if ( dbgl == DBGL_CHANGES ) {
 	
-		if ( !list_empty( &dbgl_clients[DBGL_CHANGES    ] ) ) dbgl_out[i++] = DBGL_CHANGES;
-		if ( !list_empty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_CHANGES    ] ) ) dbgl_out[i++] = DBGL_CHANGES;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
 
 	} else if ( dbgl == DBGL_TEST ) {
 	
-		if ( !list_empty( &dbgl_clients[DBGL_TEST       ] ) ) dbgl_out[i++] = DBGL_TEST;
-		if ( !list_empty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_TEST       ] ) ) dbgl_out[i++] = DBGL_TEST;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
 
 	} else if ( dbgl == DBGL_PROFILE ) {
 	
-		if ( !list_empty( &dbgl_clients[DBGL_PROFILE    ] ) ) dbgl_out[i++] = DBGL_PROFILE;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_PROFILE    ] ) ) dbgl_out[i++] = DBGL_PROFILE;
 	
 	} else if ( dbgl == DBGL_SYS ) {
 		
-		if ( !list_empty( &dbgl_clients[DBGL_SYS        ] ) ) dbgl_out[i++] = DBGL_SYS;
-		if ( !list_empty( &dbgl_clients[DBGL_CHANGES    ] ) ) dbgl_out[i++] = DBGL_CHANGES;
-		if ( !list_empty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_SYS        ] ) ) dbgl_out[i++] = DBGL_SYS;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_CHANGES    ] ) ) dbgl_out[i++] = DBGL_CHANGES;
+		if ( !OLIsListEmpty( &dbgl_clients[DBGL_ALL        ] ) ) dbgl_out[i++] = DBGL_ALL;
 	
 		if ( check_len )
 			mute_dbgl_sys = check_dbg_history( DBGL_SYS, s, expire, check_len );
@@ -591,11 +571,8 @@ static void debug_output ( uint32_t check_len, uint32_t expire, struct ctrl_node
 		if ( level == DBGL_SYS  &&  mute_dbgl_sys == DBG_HIST_MUTED )
 			continue;
 		
-			
-		list_for_each ( list_pos, (struct list_head *)&(dbgl_clients[level]) ) {
-
-			struct dbgl_node *dn = list_entry(list_pos, struct dbgl_node, list);
-
+		OLForEach(dn, struct dbgl_node, dbgl_clients[DBGL_ALL])
+		{
 			if ( !dn->cn  ||  dn->cn->fd <= 0 )
 				continue;
 			
@@ -677,7 +654,7 @@ void _dbgf_all ( int8_t dbgt, char const *f, char *last, ... ) {
 
 uint8_t __dbgf_all( void ) {
 	
-	if ( debug_level != DBGL_ALL  &&  list_empty( &dbgl_clients[DBGL_ALL] ) )
+	if ( debug_level != DBGL_ALL  &&  OLIsListEmpty( &dbgl_clients[DBGL_ALL] ) )
 		return NO;
 	
 	return YES;
@@ -1674,7 +1651,6 @@ static int32_t call_opt_patch( uint8_t ad, struct opt_type *opt, struct opt_pare
 			
 			if ( is_valid_opt_ival( opt, strm, cn ) == FAILURE )
 				return FAILURE;
-			
 		}
 		
 		if ( opt->opt_t == A_PS1  ||  opt->opt_t == A_PMN ) {
@@ -3023,7 +2999,7 @@ static int32_t opt_uptime ( uint8_t cmd, uint8_t _save, struct opt_type *opt, st
 static int8_t show_info ( struct ctrl_node *cn, void *data, struct opt_type *opt, struct opt_parent *p, struct opt_child *c ) {
 	
 	if ( c )
-		dbg_printf( cn, "    /%-18s %-20s %s%s\n",
+        dbg_printf( cn, "    /%-18s %-20s %s%s\n",
 		            c->c_opt->long_name, c->c_val, (c->c_ref ? "resolved from " : ""), (c->c_ref ? c->c_ref : "") );
 	else
 		dbg_printf( cn, " %-22s %-20s %s%s\n",
@@ -3163,7 +3139,7 @@ static int32_t opt_help ( uint8_t cmd, uint8_t _save, struct opt_type *opt, stru
 	} else if ( !strcmp(opt->long_name, ARG_VERSION) ) {
 		
 		dbg_printf( cn, "BMX %s%s (compatibility version %i)\n", 
-		            SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), COMPAT_VERSION );
+		            SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), COMPAT_VERSION_X );
 		
 #ifndef NOTRAILER
 	} else if ( !strcmp(opt->long_name, ARG_TRAILER) ) {
@@ -3220,13 +3196,6 @@ static int32_t opt_run_dir ( uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 	
 	return SUCCESS;
 }
-
-
-
-
-
-
-
 
 
 static struct opt_type control_options[]= 
@@ -3323,13 +3292,17 @@ void init_control( void ) {
 	
 	int i;
 	
+	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ )
+	{
+		OLInitializeListHead(&dbgl_clients[i]);
+	}
+
+	OLInitializeListHead(&ctrl_list);
+
 	char *d = getenv(BMX_ENV_DEBUG);
 	if ( d  &&  strtol(d, NULL , 10) >= DBGL_MIN  &&  strtol(d, NULL , 10) <= DBGL_MAX )
 		debug_level = strtol(d, NULL , 10);
 
-	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ )
-		INIT_LIST_HEAD_FIRST( dbgl_clients[i] );
-	
 	openlog( "bmx", LOG_PID, LOG_DAEMON );
 	
 	memset( &Patch_opt, 0, sizeof( struct opt_type ) );
@@ -3366,14 +3339,18 @@ void cleanup_control( void ) {
 	
 	unix_sock = 0;
 	
-	close_ctrl_node( CTRL_PURGE_ALL, 0 );
-	
-	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ ) {
-		
-		while( !list_empty( &dbgl_clients[i] ) )
-			remove_dbgl_node( (list_entry( (&dbgl_clients[i])->next, struct dbgl_node, list ))->cn );
-		
+	//remove all cn (ctrl_node) from client lists
+	for ( i = DBGL_MIN; i <= DBGL_MAX; i++ )
+	{
+		for(LIST_ENTRY *pEntry = OLGetNext(&dbgl_clients[i]); !IsSameListEntry(pEntry,&dbgl_clients[i]); pEntry = OLGetNext((&dbgl_clients[i])))
+		{
+			OLRemoveEntryList(pEntry);
+			debugFree(pEntry, 218);
+		}
 	}
-	
+
+	//free cn after clearing dbgl_clients
+	close_ctrl_node( CTRL_PURGE_ALL, 0 );
+
 }
 

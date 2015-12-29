@@ -38,6 +38,7 @@
 #include "metrics.h"
 #include "plugin.h"
 #include "schedule.h"
+#include "netid.h"
 //#include "avl.h"
 
 # define timercpy(d, a) (d)->tv_sec = (a)->tv_sec; (d)->tv_usec = (a)->tv_usec; 
@@ -442,25 +443,27 @@ void cleanup_all( int status ) {
 		
 		cleanup_route();
 		
-		struct list_head *list_pos, *list_tmp;
-		list_for_each_safe( list_pos, list_tmp, &if_list ) {
-			
-			struct batman_if *bif = list_entry( list_pos, struct batman_if, list );
+        //clear/remove all interfaces
+        OLForEach(bif, struct batman_if, if_list) {
 			
 			if ( bif->if_active )
 				if_deactivate( bif );
 			
 			remove_outstanding_ogms( bif );
 			
-			list_del( (struct list_head *)&if_list, list_pos, &if_list );
+            OLRemoveEntryList(&bif->entry);
 
-                        //debugFree(bif->own_ogm_out, 1209);
-                        debugFree(bif, 1214);
+            //debugFree(bif->own_ogm_out, 1209);
+            debugFree(bif, 1214);
+
+            bif = (struct batman_if*)&if_list; //restart from start of list
 		}
 
 		// last, close debugging system and check for forgotten resources...
 		cleanup_control();
 		
+        cleanup_netid();
+
 		checkLeak();
 	}
 	
@@ -521,7 +524,9 @@ int main( int argc, char *argv[] ) {
 	init_schedule();
 	
 	init_plugin();
-	
+
+    netid_init();
+
 	apply_init_args( argc, argv );
 	
 	check_kernel_config( NULL );

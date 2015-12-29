@@ -1,0 +1,146 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          S53backbone
+# Required-Start:    S40network
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start vtun backbone 
+# Description:       start vtun backbone 
+### END INIT INFO
+
+WAN_DEV=$(nvram get ifname)
+
+CONF_DIR=/etc/fastd
+FASTD_CONF=$CONF_DIR/fastd.conf
+CONF_PEERS=peers
+PID_FILE=/var/run/fastd.pid
+backbone_server_port=5001
+
+
+eval $(ddmesh-ipcalc.sh -n $(nvram get ddmesh_node))
+
+mkdir -p $CONF_DIR
+mkdir -p $CONF_DIR/$CONF_PEERS
+
+
+generate_fastd_conf()
+{
+ # sources: https://projects.universe-factory.net/projects/fastd/wiki
+ # docs: http://fastd.readthedocs.org/en/v17/
+
+ MTU=$(nvram get mesh_mtu)
+ secret=$(nvram get fastd_secret)
+ if [ -z "$secret" ]; then
+	logger -t fastd "no secret key - abort"
+	exit 1
+ fi
+
+ cat << EOM > $FASTD_CONF
+log level warn;
+log to syslog level debug;
+mode tap;
+interface "tbb_fastd";
+method "salsa2012+umac";
+method "null";
+secure handshakes yes;
+bind any:$backbone_server_port;
+secret "$secret";
+mtu $MTU;
+include peers from "$CONF_PEERS";
+forward no;
+on up sync "/etc/fastd/cmd.sh up";
+on down sync "/etc/fastd/cmd.sh down";
+on connect sync "/etc/fastd/cmd.sh connect";
+on establish sync "/etc/fastd/cmd.sh establish";
+on disestablish sync "/etc/fastd/cmd.sh disestablish";
+
+#only enable verify if I want to ignore peer config files
+on verify sync "/etc/fastd/cmd.sh verify";
+
+EOM
+}
+
+add_incomming()
+{
+	local key=$1 
+	local comment="$2"
+	
+	if [ -n "$key" -a -n "$comment" ]; then
+		#echo "[$key:$comment]"
+		FILE=$CONF_DIR/$CONF_PEERS/accept_$key.conf
+		echo "# $comment" > $FILE
+		echo "key \"$key\";" >> $FILE
+	else
+		echo "missing args"
+	fi
+}
+
+				
+add_outgoing()
+{
+	local host=$1  #hostname or ip
+	local port=$2 
+	local key=$3 
+
+	if [ -n "$host" -a -n "$port" -a -n "$key" -a -n "$key" ]; then
+		#echo "[$host:$port:$key]"
+		FILE=$CONF_DIR/$CONF_PEERS/"connect_"$host"_"$port".conf"
+		echo "key \"$key\";" > $FILE
+		echo "remote ipv4 \"$host\":$port;" >> $FILE
+	else
+		echo "missing args"
+	fi
+}
+
+case "$1" in
+
+ start)				
+	echo "Starting backbone..."
+
+	generate_fastd_conf
+	fastd --config $FASTD_CONF --pid-file /var/run/fastd.pid --daemon
+	;;
+
+  stop)
+	echo "Stopping backbone network..."
+	if [ -f $PID_FILE ]; then
+		kill $(cat $PID_FILE)
+		rm -f $PID_FILE 
+	fi
+	;;
+
+  restart)
+	$0 stop
+	sleep 2
+	$0 start
+  	;;
+
+  genkey)
+	fastd --generate-key
+	;;
+
+  get_public_key)
+	nvram get fastd_public
+	;;
+
+  add_accept)
+	key=$2
+	comment=$3
+	add_incomming $key "$comment"
+	;;
+
+  add_connect)
+	host=$1
+	port=$2
+	key=$3	
+	add_outgoing $host $port $key
+  	;;
+
+   *)
+	echo "usage: $(basename $0) [start | stop | restart | genkey | get_public_key | add_accept | add_connect"
+	echo "	add_accept  <pubkey> <comment>"
+	echo "	add_connect <host> <port> <pubkey>"
+esac
+
+

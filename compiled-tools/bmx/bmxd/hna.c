@@ -36,7 +36,7 @@
 
 
 //stephan: ignore orginiator that uses hna.
-//Only nodes with IP range 10.200.0.1-15 are allowed to send HNA.
+//Only nodes with IP range 10.200.0.1-10.200.1.255 (knoten 0-509) are allowed to send HNA.
 //These are special nodes (vserver). IGNORE all other HNA for network stability and security 
 #define STEPHAN_IGNORE_ORIGINATOR_HNA 1
 
@@ -516,9 +516,9 @@ static void cb_hna_orig_destroy( struct orig_node *on ) {
 //stephan: only accept hna if comming from vserver ip ranges.
 #if STEPHAN_IGNORE_ORIGINATOR_HNA 
 static int ddmesh_ignore_hna(struct orig_node *orig_node)
-  { //10.200.0.1-10.200.0.15 (knoten 0-14)
+  { //10.200.0.1-10.200.1.255 (knoten 0-509)
     const char vserver_ip[ADDR_STR_LEN] = "10.200.0.1";
-    u_int32_t  vserver_mask = 28;
+    u_int32_t  vserver_mask = 23;  //510 vserver
     u_int32_t  vserver_nip;
     u_int32_t  orig_nip;
 
@@ -614,7 +614,7 @@ static int32_t cb_hna_ogm_hook( struct msg_buff *mb, uint16_t oCtx, struct neigh
                                         // if HNA is blocked by other node which has ńot bean heard of for 
                                         // dad-timeout secs, 
                                         // then its' HNAs should be removed before purge-timeout expires
-                                        if (LSEQ_U32((uint32_t)dad_to, (((batman_time_t) (batman_time - hn->orig->last_valid_time)) / 1000)))
+                                        if (LSEQ_U32(dad_to, (int64_t)(((batman_time_t) (batman_time - hn->orig->last_valid_time)) / 1000)))
                                                 update_other_hna(hn->orig, 0, NULL, 0);
                                 }
 				

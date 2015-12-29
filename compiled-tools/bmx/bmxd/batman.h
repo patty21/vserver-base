@@ -61,10 +61,11 @@
  * Global Variables and definitions 
  */
 
-#define SOURCE_VERSION "0.3-freifunk-dresden" //put exactly one distinct word inside the string like "0.3-pre-alpha" or "0.3-rc1" or "0.3"
+#define SOURCE_VERSION "FFDD 0.4" //put exactly one distinct word inside the string like "0.3-pre-alpha" or "0.3-rc1" or "0.3"
 
 #define COMPAT_VERSION 10 
-
+#define COMPAT_VERSION_NETID 11 //defines the version when command line parameter meshNetworkIdSelected and greater 0
+#define COMPAT_VERSION_X (GET_MESH_NET_ID(meshNetworkIdSelected)==DEF_MESH_NET_ID ? COMPAT_VERSION : COMPAT_VERSION_NETID)
 
 #define ADDR_STR_LEN 16
 
@@ -228,7 +229,7 @@ extern uint32_t My_pid;
 #define ARG_LINKS "links"
 #define ARG_ROUTES "routes"
 #define ARG_INTERFACES "interfaces"
-
+#define ARG_NETWORKS "networks"
 
 #define ARG_NETA "neta"
 #define ARG_NETB "netb"
@@ -254,7 +255,7 @@ extern uint32_t My_pid;
 #define IS_ASOCIAL				0x00004000
 
 //#define BATMAN_TIME_START 4294367 //2147183 //5min vor overflow
-extern batman_time_t batman_time;
+extern batman_time_t batman_time; //milli seconds
 extern batman_time_t batman_time_sec;
 
 extern uint8_t on_the_fly;
@@ -280,7 +281,7 @@ extern uint32_t s_curr_avg_cpu_load;
 #define BAT_CAPAB_UNICAST_PROBES 0x01 /* set on bat_header->link_flags to announce capability for unidirectional UDP link measurements */
 #define BAT_CAPAB_ ...
 
-
+//for COMPAT_VERSION
 struct bat_header
 {
 	uint8_t  version;
@@ -288,6 +289,20 @@ struct bat_header
 	uint8_t  reserved;
 	uint8_t  size; 		// the relevant data size in 4 oktets blocks of the packet (including the bat_header)
 } __attribute__((packed));
+
+//for COMPAT_VERSION_NETID
+struct bat_header_netid
+{
+    uint8_t  version;
+    uint8_t  link_flags; 	// BAT_CAPAB_UNICAST_PROBES, ...
+    uint8_t  reserved;
+    uint8_t  size; 		// the relevant data size in 4 oktets blocks of the packet (including the bat_header)
+    uint32_t meshNetworkId;
+} __attribute__((packed));
+
+#define BAT_HEADER_SIZE ((int16_t)(GET_MESH_NET_ID(meshNetworkIdSelected)==DEF_MESH_NET_ID ? sizeof(struct bat_header) : sizeof(struct bat_header_netid)))
+#define BAT_HEADER_SIZE_COMPAT_VERSION sizeof(struct bat_header)
+#define BAT_HEADER_SIZE_COMPAT_VERSION_NETID sizeof(struct bat_header_netid)
 
 
 #define BAT_TYPE_OGM  0x00	// originator message
@@ -458,7 +473,7 @@ struct msg_buff {
 
 struct send_node                 /* structure for send_list maintaining packets to be (re-)broadcasted */
 {
-	struct list_head list;
+    LIST_ENTRY entry;
     batman_time_t send_time;
 	int16_t  send_bucket;
 	uint8_t  iteration;
@@ -476,7 +491,7 @@ struct send_node                 /* structure for send_list maintaining packets 
 
 struct task_node 
 { 
-	struct list_head list; 
+    LIST_ENTRY entry;
     batman_time_t expire;
 	void (* task) (void *fpara); // pointer to the function to be executed
 	void *data; //NULL or pointer to data to be given to function. Data will be freed after functio is called.
@@ -484,7 +499,7 @@ struct task_node
 
 struct batman_if
 {
-	struct list_head list;
+    LIST_ENTRY entry;
 	char dev[IFNAMSIZ+1];
 	char dev_phy[IFNAMSIZ+1];
 	char if_ip_str[ADDR_STR_LEN];

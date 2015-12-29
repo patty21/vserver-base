@@ -29,5 +29,6 @@ post-cmd:update-rc.d S42firewall6 defaults
 post-cmd:update-rc.d S52batmand defaults  
 post-cmd:update-rc.d S52bmx6 defaults   
 post-cmd:update-rc.d S53backbone defaults
+post-cmd:update-rc.d S53backbone-fastd defaults
 post-cmd:update-rc.d S90nuttcp defaults  
 
