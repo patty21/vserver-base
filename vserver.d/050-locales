@@ -1,0 +1,6 @@
+
+# setup locales
+language-pack-en-base
+post-cmd:dpkg-reconfigure locales
+
+
