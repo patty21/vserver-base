@@ -13,7 +13,7 @@ cd ~/freifunk/vserver-base
 
 # bmxd läuft noch und wird daher nicht installiert
 killall bmxd
-cp cp bmx/bmxd/bmxd /usr/bin
+cp bmx/bmxd/bmxd /usr/bin
 
 # fastd files copieren
 # S53backbone-fastd erzeugt die notwendigen config files dynamisch und verwendet
@@ -45,5 +45,30 @@ update-rc.d S53backbone-fastd defaults
 # der firmware hinterlegt sind und beim firmware upgrade fuer die eingetragenen vpn server hinterlegt 
 # sind
 meld files/etc/nvram.conf /etc/nvram.conf 
+
+### optional : monitorix
+cp files/etc/apache2/conf-enabled/monitorix.conf /etc/apache2/conf-enabled/
+cp files/etc/apache2/sites-enabled/001-freifunk.conf /etc/apache2/sites-enabled/
+mkdir /etc/monitorix
+cp files/etc/monitorix/monitorix.conf /etc/monitorix/
+service apache2 restart
+
+### set connection track limits
+cp files/etc/init.d/S40network /etc/init.d/S40network
+cp files/usr/bin/conntrack.sh /usr/bin/
+
+### other updates
+mkdir -p /var/log/freifunk/router/
+cp files/etc/logrotate.d/freifunk /etc/logrotate.d/
+cp files/etc/rsyslog.d/10-freifunk.conf /etc/rsyslog.d/
+
+
+
+
+
+
+
+
+
 
 

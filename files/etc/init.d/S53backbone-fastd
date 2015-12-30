@@ -1,16 +1,16 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          S53backbone
+# Provides:          S53backbone-fastd
 # Required-Start:    S40network
 # Required-Stop:
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Start vtun backbone 
-# Description:       start vtun backbone 
+# Short-Description: Start fastd backbone 
+# Description:       start fastd backbone 
 ### END INIT INFO
 
 WAN_DEV=$(nvram get ifname)
-
+DAEMON=/usr/local/bin/fastd
 CONF_DIR=/etc/fastd
 FASTD_CONF=$CONF_DIR/fastd.conf
 CONF_PEERS=peers
@@ -99,7 +99,7 @@ case "$1" in
 	echo "Starting backbone..."
 
 	generate_fastd_conf
-	fastd --config $FASTD_CONF --pid-file /var/run/fastd.pid --daemon
+	$DAEMON --config $FASTD_CONF --pid-file /var/run/fastd.pid --daemon
 	;;
 
   stop)
