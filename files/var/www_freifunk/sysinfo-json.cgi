@@ -14,12 +14,15 @@ test -z "$ddmesh_node" && exit
 eval $(ddmesh-ipcalc.sh -n $ddmesh_node)
 tunnel_info="$(sudo /usr/bin/freifunk-gateway-info.sh)"
 
-WLDEV=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
-WANDEV=$(nvram get ifname)
+wan_device=$(nvram get ifname)
+wifi_device=$(l=$(grep : /proc/net/wireless);l=${l%:*};echo ${l##* })
+wifi2_device=
+vpn=vpn0
+gwt=bat0
 
 cat << EOM
 {
- "version":"8",
+ "version":"9",
  "timestamp":"$(date +'%s')",
  "data":{
 
@@ -53,7 +56,8 @@ $(cat /var/etc/resolv.conf.dynamic | sed -n '/nameserver[ 	]\+10\.200/{s#[ 	]*na
 			"city":"$(nvram get city)",
 			"node":"$_ddmesh_node",
 			"domain":"$_ddmesh_domain",
-			"ip":"$_ddmesh_ip"
+			"ip":"$_ddmesh_ip",
+			"fastd_pubkey":"$(/etc/init.d/S53backbone-fastd get_public_key)"
 		},
 		"gps":{
 			"latitude":"$(nvram get gps_latitude)",
@@ -87,6 +91,10 @@ EOM
 				echo "				{\"first\":\"$1\",\"last\":\"$1\"},"
 			done 
 			echo "				{\"first\":\"\",\"last\":\"\"}"
+			#reset IFS
+			IFS='
+'
+
 cat << EOM
 			]
 		},
@@ -97,17 +105,11 @@ cat<<EOM
 			"accepted_user_count" : "0",
 			"dhcp_count" : "0",
 			"dhcp_lease" : "0",
-			"traffic_adhoc": "",
-			"traffic_ap": "",
-			"traffic_wan": "$(cat /proc/net/dev | grep $WANDEV: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
-			"traffic_ovpn": "$(cat /proc/net/dev | grep vpn0: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
-			"traffic_icvpn": "$(cat /proc/net/dev | grep icvpn: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')",
 EOM
-			IFS='
-'
-			for iface in $(ip link show | sed -n '/^[0-9]\+:/s#^[0-9]\+:[ ]\+\(.*\):.*$#\1#p' | sed "/vpn/d;/lo/d;/bat/d")
+			for iface in $(cat /proc/net/dev | sed -n '3,${s#^[ 	]*\([^:]\+\).*#\1#p}')
 			do
-				echo "			\"traffic_$iface\": \"$(cat /proc/net/dev | grep $iface: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')\","
+				iface_alias=$(echo $iface | sed "s#^$wan_device\$#wan#;s#^$wifi_device\$#adhoc#;s#^$wifi2_device\$#ap#;s#^$vpn\$#ovpn#;s#^$gwt\$#gwt#")
+				echo "			\"traffic_$iface_alias\": \"$(cat /proc/net/dev | grep $iface: | sed -n 's#.*:[ ]*\([0-9]\+\)\([ ]\+\([0-9]\+\)\)\{8\}.*#\1,\3#;p')\","
 			done
 cat<<EOM
 $(cat /proc/meminfo | sed 's#\(.*\):[ 	]\+\([0-9]\+\)[ 	]*\(.*\)#\t\t\t\"meminfo_\1\" : \"\2\ \3\",#')

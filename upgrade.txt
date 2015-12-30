@@ -1,0 +1,49 @@
+#vserver upgrade to fastd
+
+
+cd ~/freifunk/vserver-base
+git pull
+
+# bmxd und fastd neu compilieren und installieren
+cd compiled-tools
+./build.sh
+
+# zurück ins basis verzeichnis
+cd ~/freifunk/vserver-base
+
+# bmxd läuft noch und wird daher nicht installiert
+killall bmxd
+cp cp bmx/bmxd/bmxd /usr/bin
+
+# fastd files copieren
+# S53backbone-fastd erzeugt die notwendigen config files dynamisch und verwendet
+# dabei /etc/nvram.conf
+# /etc/fastd/cmd.sh ist so konfiguiert, dass es jeden client aktzeptiert und "lernt"
+# dabei werden client konfigfiles unterhalb des peers directory erzeugt.
+# sollen nur noch die "gelernten" clients eine verbindung aufbauen, so kann man in
+# cmd.sh bei "verify" statt "exit 0" in "exit 1" geändert werden. oder man passt
+# in S53backbone-fastd die generation von fastd.conf an, so dass die zeile "on verify...."
+# kommentiert wird. es sollte mindestens die zweite lösung genutzt werden. dann werden nur
+# noch die gespeicherten clients aktzeptiert.
+# sollen später weitere clients manuell hinzugefügt werden, so einfach nach dem selben schema
+# ein weiteres file erzeugen und den public-key des routers eintragen. dieser kann via sysinfo-json.cgi
+# oder vom eigentümer in der firmware unter den backbone-einstellungen ermittelt werden.
+cp files/etc/init.d/S53backbone-fastd /etc/init.d/
+cp -a files/etc/fastd /etc/
+cp files/etc/init.d/S52batmand /etc/init.d/
+cp files/etc/init.d/S41firewall /etc/init.d/
+
+# neue version von sysinfo-json.cgi
+cp files/var/www_freifunk/sysinfo-json.cgi /var/www_freifunk/
+
+# init script automatisch starten lassen
+update-rc.d S53backbone-fastd defaults
+
+# nvram config anpassen. ambesten mit dem grafischen diff-tool 'meld'
+# mesh_mtu, fastd_secret, fastd_public
+# die beiden fastd keys bitte bei mir (stephan) anfordern, da die public keys fuer vpn1 bis vpn10 in
+# der firmware hinterlegt sind und beim firmware upgrade fuer die eingetragenen vpn server hinterlegt 
+# sind
+meld files/etc/nvram.conf /etc/nvram.conf 
+
+
