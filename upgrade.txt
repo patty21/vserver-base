@@ -1,6 +1,6 @@
 #vserver upgrade to fastd
 
-apt-get install language-pack-en-base
+apt-get install language-pack-en-base cmake pkg-config
 
 cd ~/freifunk/vserver-base
 git pull
