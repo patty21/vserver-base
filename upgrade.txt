@@ -1,5 +1,6 @@
 #vserver upgrade to fastd
 
+apt-get install language-pack-en-base
 
 cd ~/freifunk/vserver-base
 git pull
@@ -13,7 +14,7 @@ cd ~/freifunk/vserver-base
 
 # bmxd läuft noch und wird daher nicht installiert
 killall bmxd
-cp bmx/bmxd/bmxd /usr/bin
+cp compiled-tools/bmx/bmxd/bmxd /usr/bin
 
 # fastd files copieren
 # S53backbone-fastd erzeugt die notwendigen config files dynamisch und verwendet
@@ -47,10 +48,16 @@ update-rc.d S53backbone-fastd defaults
 meld files/etc/nvram.conf /etc/nvram.conf 
 
 ### optional : monitorix
+echo "deb http://apt.izzysoft.de/ubuntu generic universe" >> /etc/apt/sources.list
+wget -O /tmp/izzysoft.asc http://apt.izzysoft.de/izzysoft.asc
+apt-key add /tmp/izzysoft.asc
+apt-get update
+apt-get install monitorix 
 cp files/etc/apache2/conf-enabled/monitorix.conf /etc/apache2/conf-enabled/
 cp files/etc/apache2/sites-enabled/001-freifunk.conf /etc/apache2/sites-enabled/
 mkdir /etc/monitorix
 cp files/etc/monitorix/monitorix.conf /etc/monitorix/
+service monitorix restart
 service apache2 restart
 
 ### set connection track limits

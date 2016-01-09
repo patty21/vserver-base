@@ -2,8 +2,8 @@
 #some freifunk (cron.d)scripts are running as user freifunk
 #change directory rights
 post-cmd:mkdir -p /var/lib/freifunk
-#post-cmd:chown -R freifunk:freifunk /var/lib/freifunk
-#post-cmd:chmod -R go+w /var/lib/freifunk
+post-cmd:chown -R freifunk:freifunk /var/lib/freifunk
+post-cmd:chmod -R go+w /var/lib/freifunk
 post-cmd:chown root:root /etc/cron.d/freifunk
 post-cmd:chmod 644 /etc/cron.d/freifunk
 
