@@ -7,3 +7,15 @@ pre-cmd:apt-key add /tmp/izzysoft.asc
 pre-cmd:apt-get update
 pre-cmd:apt-get install monitorix 
 
+
+# some needed stuff to monitor
+
+# needed to monitor apache
+post-cmd:a2enmod status
+
+
+# restart services to apply changes
+post-cmd:service monitorix restart
+post-cmd:service apache2 restart
+
+
