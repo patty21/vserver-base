@@ -75,8 +75,8 @@ test -x $DAEMON_PATH/$DAEMON || exit 0
 case "$ARG1" in
   start)
 	echo "Starting $DAEMON: opt: $DAEMON_OPTS"
-	echo /tmp/coredump > /proc/sys/kernel/core_pattern
-	ulimit -c unlimited
+#	echo /tmp/coredump > /proc/sys/kernel/core_pattern
+#	ulimit -c unlimited
 	$DAEMON_PATH/$DAEMON $DAEMON_OPTS
 #	$DAEMON_PATH/$DAEMON $DAEMON_OPTS -d4
 	;;
