@@ -21,7 +21,9 @@ php5-dev
 libpcre3-dev
 post-cmd:pecl install raphf
 post-cmd:pecl install propro 
-#activate extensions raphf, propro before pecl_http
+#activate extensions raphf, propro before pecl_http. the file /etc/php5/mods-available/freifunk.ini
+# contains this settings and is already copied.
+# php5enmod freifunk enables the extension
 post-cmd:php5enmod freifunk
 post-cmd:pecl install pecl_http
 
