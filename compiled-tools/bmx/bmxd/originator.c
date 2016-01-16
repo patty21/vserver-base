@@ -31,7 +31,6 @@
 #include "plugin.h"
 #include "schedule.h"
 //#include "avl.h"
-#include "netid.h"
 
 static int32_t my_seqno;
 
@@ -66,10 +65,6 @@ int32_t dad_to = DEF_DAD_TO;
 
 static int32_t Asocial_device = DEF_ASOCIAL;
 
-int32_t meshNetworkId = DEF_MESH_NET_ID;
-int32_t meshNetworkIdPreferred = DEF_MESH_NET_ID;
-uint32_t meshNetworkIdSelected = DEF_MESH_NET_ID;
-
 int32_t Ttl = DEF_TTL;
 
 int32_t wl_clones = DEF_WL_CLONES;
@@ -92,7 +87,10 @@ uint32_t primary_addr = 0;
 //struct avl_tree orig_avl = {sizeof( uint32_t), NULL};
 AVL_TREE( orig_avl, sizeof( uint32_t) );
 
-LIST_ENTRY if_list;
+SIMPEL_LIST( if_list );
+
+
+
 
 
 static void update_routes( struct orig_node *orig_node, struct neigh_node *new_router ) {
@@ -679,7 +677,7 @@ static void set_primary_orig( struct orig_node *orig_node, uint32_t new_primary_
 		
 		if ( orig_node->orig != new_primary_addr ) {
 
-			orig_node->primary_orig_node = get_orig_node( new_primary_addr, YES/*create*/ );
+                        orig_node->primary_orig_node = get_orig_node( new_primary_addr, YES/*create*/ );
 			orig_node->primary_orig_node->pog_refcnt++;
 			
 		} else {
@@ -935,7 +933,9 @@ int tq_power( int tq_rate_value, int range ) {
 
 
 
-static int8_t validate_considered_order( struct orig_node *orig_node, SQ_TYPE seqno, uint8_t ttl, uint32_t neigh, struct batman_if *iif ) {
+static
+int8_t validate_considered_order( struct orig_node *orig_node, SQ_TYPE seqno, uint8_t ttl, uint32_t neigh, struct batman_if *iif ) {
+
         struct neigh_node_key key = {neigh, iif};
         struct avl_node *an = avl_find( &orig_node->neigh_avl, &key );
         struct neigh_node *nn = an ? (struct neigh_node*) an->key : NULL;
@@ -995,7 +995,7 @@ struct orig_node *get_orig_node( uint32_t addr, uint8_t create ) {
 	memset( orig_node, 0, (sizeof(struct orig_node) + (plugin_data_registries[PLUGIN_DATA_ORIG] * sizeof(void*) ) ) );
 	
 	INIT_LIST_HEAD_FIRST( orig_node->neigh_list );
-	AVL_INIT_TREE( orig_node->neigh_avl, sizeof( struct neigh_node_key ) );
+        AVL_INIT_TREE( orig_node->neigh_avl, sizeof( struct neigh_node_key ) );
 
 	
 	addr_to_str( addr, orig_node->orig_str );
@@ -1077,7 +1077,7 @@ void purge_orig( batman_time_t curr_time, struct batman_if *bif ) {
 				if ( !bif  ||  ( neigh_node->nnkey_iif == bif ) ) {
 					
 					list_del( neigh_prev, neigh_pos, &orig_node->neigh_list );
-					avl_remove( &orig_node->neigh_avl, neigh_node );
+                                        avl_remove( &orig_node->neigh_avl, neigh_node );
 					
 					debugFree( neigh_node, 1403 );
 					
@@ -1102,7 +1102,7 @@ void purge_orig( batman_time_t curr_time, struct batman_if *bif ) {
 				
 				set_primary_orig( orig_node, 0 );
 				
-				avl_remove( &orig_avl, /*(uint32_t*)*/orig_node);
+                                avl_remove( &orig_avl, /*(uint32_t*)*/orig_node);
 				
 				debugFree( orig_node, 1402 );
 			}
@@ -1256,6 +1256,7 @@ void process_ogm( struct msg_buff *mb ) {
 	
 	prof_start( PROF_process_ogm );
 	
+	struct list_head *list_pos;
 	struct orig_node *orig_node, *orig_node_neigh; 
 	struct link_node_dev *lndev = NULL;
 	
@@ -1272,12 +1273,12 @@ void process_ogm( struct msg_buff *mb ) {
 	oCtx |= (ogm->orig == neigh) ? IS_DIRECT_NEIGH : 0;
 	
 	
-    dbgf_all( DBGT_INFO, "OG %s  via IF %s %s  NB %s  "
-						"SQN %d  TTL %d  V %d  UDF %d  IDF %d  DPF %d, directNB %d, asocial %d(%d)",
-                        ipStr( ogm->orig ), iif->dev, iif->if_ip_str, mb->neigh_str,
-						ogm->ogm_seqno, ogm->ogm_ttl, COMPAT_VERSION_X,
-						(oCtx & HAS_UNIDIRECT_FLAG), (oCtx & HAS_DIRECTLINK_FLAG), 
-						(oCtx & HAS_CLONED_FLAG), (oCtx & IS_DIRECT_NEIGH), (oCtx & IS_ASOCIAL), Asocial_device);
+	dbgf_all( DBGT_INFO, "OG %s  via IF %s %s  NB %s  "
+	          "SQN %d  TTL %d  V %d  UDF %d  IDF %d  DPF %d, directNB %d, asocial %d(%d)", 
+	          ipStr( ogm->orig ), iif->dev, iif->if_ip_str, mb->neigh_str, 
+	          ogm->ogm_seqno, ogm->ogm_ttl, COMPAT_VERSION, 
+	          (oCtx & HAS_UNIDIRECT_FLAG), (oCtx & HAS_DIRECTLINK_FLAG), 
+	          (oCtx & HAS_CLONED_FLAG), (oCtx & IS_DIRECT_NEIGH), (oCtx & IS_ASOCIAL), Asocial_device);
 	
 	
 	if ( ogm->ogm_pws < MIN_PWS  ||  ogm->ogm_pws > MAX_PWS ) {
@@ -1287,8 +1288,10 @@ void process_ogm( struct msg_buff *mb ) {
 		goto process_ogm_end;
 	}
 	
-    OLForEach(bif, struct batman_if, if_list) {
-
+	
+	list_for_each( list_pos, &if_list ) {
+		
+		struct batman_if *bif = list_entry( list_pos, struct batman_if, list );
         //eine ogm, die das interface nicht verlassen hat und gleich hier zurück gespiegelt wird
         //könnte passieren wenn es ein loopback ist.
 		if ( neigh == bif->if_addr ) {
@@ -1362,8 +1365,8 @@ void process_ogm( struct msg_buff *mb ) {
 	
 	// drop packet if sender is not a direct NB and if we have no route towards the rebroadcasting NB
         if (!(oCtx & IS_DIRECT_NEIGH) && !(orig_node_neigh->router)) {
-					dbgf_all(DBGT_INFO, "drop OGM: %s via unknown (%s) (non-direct) neighbor!", ipStr(ogm->orig), mb->neigh_str);
-					goto process_ogm_end;
+		dbgf_all(DBGT_INFO, "drop OGM: %s via unknown (%s) (non-direct) neighbor!", ipStr(ogm->orig), mb->neigh_str);
+                goto process_ogm_end;
         }
 	
 
@@ -1400,7 +1403,7 @@ void process_ogm( struct msg_buff *mb ) {
 		
 	
 	if ( validate_primary_orig( orig_node, mb, oCtx ) == FAILURE ) {
-		dbg( DBGL_SYS, DBGT_WARN, "drop OGM: primary originator/if conflict! (%s via NB %s IF %s )", ipStr(ogm->orig), mb->neigh_str,iif->dev );
+		dbg( DBGL_SYS, DBGT_WARN, "drop OGM: primary originator/if conflict!" );
 		goto process_ogm_end;
 	}
 	
@@ -1496,9 +1499,8 @@ void process_ogm( struct msg_buff *mb ) {
 	
 	
 	dbgf_all( DBGT_INFO,
-						"done NetId %lu OGM accepted %s  acceptable %s  bidirectLink %s  new %s  BNTOG %s  asocial %s(%d)  tq %d  "
+	          "done OGM accepted %s  acceptable %s  bidirectLink %s  new %s  BNTOG %s  asocial %s(%d)  tq %d  "
 	          "hop_penalty %d  asym_w %d  acceptSQN %d  rcvdSQN %d  rand100 %d",
-                        GET_MESH_NET_ID(meshNetworkIdSelected),
 	          ( oCtx & IS_ACCEPTED   ? "Y" : "N" ), 
 	          ( oCtx & IS_ACCEPTABLE ? "Y" : "N" ), 
 	          ( oCtx & IS_BIDIRECTIONAL ? "Y" : "N" ), 
@@ -1757,49 +1759,40 @@ int32_t opt_show_origs ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struc
 static
 int32_t opt_dev_show ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn ) {
 	
+	struct list_head *pos;
+	
 	if ( cmd == OPT_APPLY ) {
+		
+		list_for_each( pos, &if_list ) {
+			
+			struct batman_if *bif = list_entry( pos, struct batman_if, list );
 
-        OLForEach(bif, struct batman_if, if_list) {
-
-            dbg_cn( cn, DBGL_ALL, DBGT_NONE, "%-10s %5d %8s %15s/%-2d  brc %-15s  SQN %5d  TTL %2d  %11s  %8s  %11s",
-                    bif->dev,
+			dbg_cn( cn, DBGL_ALL, DBGT_NONE, "%-10s %5d %8s %15s/%-2d  brc %-15s  SQN %5d  TTL %2d  %11s  %8s  %11s",
+			        bif->dev,
                                 bif->if_index,
-                    !bif->if_active ? "-" :
-                    ( bif->if_linklayer == VAL_DEV_LL_LO ? "loopback":
-                      ( bif->if_linklayer == VAL_DEV_LL_LAN ? "ethernet":
-                        ( bif->if_linklayer == VAL_DEV_LL_WLAN ? "wireless": "???" ) ) ),
-                    bif->if_ip_str,
-                    bif->if_prefix_length,
-                    ipStr(bif->if_broad),
-                    bif->if_seqno,
-                    bif->if_ttl,
-                    bif->if_singlehomed ? "singlehomed" : "multihomed",
-                    bif->if_active ? "active" : "inactive",
-                    bif == primary_if ? "primary" : "non-primary"
-                  );
-
-        }
-    }
+			        !bif->if_active ? "-" : 
+			        ( bif->if_linklayer == VAL_DEV_LL_LO ? "loopback": 
+			          ( bif->if_linklayer == VAL_DEV_LL_LAN ? "ethernet": 
+			            ( bif->if_linklayer == VAL_DEV_LL_WLAN ? "wireless": "???" ) ) ),
+			        bif->if_ip_str,
+			        bif->if_prefix_length,
+			        ipStr(bif->if_broad),
+			        bif->if_seqno,
+			        bif->if_ttl,
+			        bif->if_singlehomed ? "singlehomed" : "multihomed",
+			        bif->if_active ? "active" : "inactive",
+			        bif == primary_if ? "primary" : "non-primary"
+			      );
+			
+		}
+	}
 	return SUCCESS;
-}
-
-
-static
-int32_t opt_show_networks ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn ) {
-
-    if ( cmd == OPT_APPLY ) {
-
-        netid_showNetworks(cn, meshNetworkIdSelected, meshNetworkId);
-
-    }
-
-    return SUCCESS;
 }
 
 static
 int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn ) {
 	
-    struct list_head *list_pos;
+	struct list_head *list_pos, *list_tmp, *list_prev;
 	struct batman_if *bif = NULL;
 	
 	struct batman_if test_bif;
@@ -1816,13 +1809,12 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 			return FAILURE;
 		}
 		
-        //original was: search interface, starting with last interface name from command line
-        //now: take the first interface and ignore others with same name. (it makes no sense to pass one interface name more than once)
-        //but it makes it easier to go through list
-        OLForEach(tmp_bif, struct batman_if, if_list) {
-            bif = tmp_bif;
+		list_prev = (struct list_head*)&if_list;
+		list_for_each_safe( list_pos, list_tmp, &if_list ) {
+			bif = list_entry( list_pos, struct batman_if, list );
 			if ( wordsEqual( bif->dev, patch->p_val ) )
 				break;
+			list_prev = list_pos;
 			bif = NULL;
 		}
 		
@@ -1844,9 +1836,9 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 				
 				remove_outstanding_ogms( bif );
 				
-                OLRemoveEntryList(&bif->entry);
+				list_del( list_prev, list_pos, &if_list );
 
-                debugFree(bif, 1214);
+                                debugFree(bif, 1214);
 				
 				return SUCCESS;
 				
@@ -1860,25 +1852,26 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 		
 		if ( !bif ) {
 			
-            if ( cmd == OPT_APPLY ) {
+			if ( cmd == OPT_APPLY ) {
 
-                bif = debugMalloc( sizeof(struct batman_if), 206 );
-                memset(bif, 0, sizeof (struct batman_if));
+                                bif = debugMalloc( sizeof(struct batman_if), 206 );
+                                memset(bif, 0, sizeof (struct batman_if));
 
+                                INIT_LIST_HEAD(&bif->list);
 
-                if ( OLIsListEmpty( &if_list ) )
-                    primary_if = bif;
+                                if ( list_empty( &if_list ) )
+					primary_if = bif;
 
-                OLInsertTailList(&if_list, &bif->entry);
+				list_add_tail( &bif->list, &if_list );
 
-            } else {
+                        } else {
 
 				bif = &test_bif;
-                memset(bif, 0, sizeof (struct batman_if));
+                                memset(bif, 0, sizeof (struct batman_if));
 
-            }
+                        }
                         
-            bif->aggregation_out = bif->aggregation_out_buff;
+                        bif->aggregation_out = bif->aggregation_out_buff;
 
 			snprintf( bif->dev, wordlen(patch->p_val)+1, "%s", patch->p_val );
 			snprintf( bif->dev_phy, wordlen(patch->p_val)+1, "%s", patch->p_val );
@@ -1891,12 +1884,9 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 			
 			bif->if_seqno_schedule = batman_time;
 			
-			bif->if_seqno = (primary_if && primary_if != bif) ? primary_if->if_seqno : my_seqno;
+            bif->if_seqno = (primary_if && primary_if != bif) ? primary_if->if_seqno : my_seqno;
 			
-            //overwrite meshNetworkIdSelected if meshNetworkId was set at command line
-            meshNetworkIdSelected = netid_getSelectedMeshNetworkId(meshNetworkIdSelected, meshNetworkId, meshNetworkIdPreferred);
-
-			bif->aggregation_len = BAT_HEADER_SIZE;
+			bif->aggregation_len = sizeof( struct bat_header );
 			
 			
 			// some configurable interface values - initialized to unspecified:
@@ -1905,6 +1895,7 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 			bif->if_ant_diversity_conf = -1;
 			bif->if_linklayer_conf = -1;
 			bif->if_singlehomed_conf = -1;
+						
 		}
 		
 		if ( cmd == OPT_CHECK )
@@ -1914,8 +1905,8 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 			
 			struct opt_child *c = list_entry( list_pos, struct opt_child, list );
 			
-            int32_t val = c->c_val ? strtol( c->c_val , NULL , 10 ) : -1 ;
-
+			int32_t val = c->c_val ? strtol( c->c_val , NULL , 10 ) : -1 ;
+			
 			if ( !strcmp( c->c_opt->long_name, ARG_DEV_TTL ) ) {
 				
 				bif->if_ttl_conf = val ;
@@ -1932,9 +1923,7 @@ int32_t opt_dev ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_p
 				
 				bif->if_linklayer_conf = val;
 				bif->if_conf_hard_changed = YES;
-                //set linklayer also when changing argument
-                bif->if_linklayer = val;
-
+				
 			} else if ( !strcmp( c->c_opt->long_name, ARG_DEV_HIDE ) ) {
 				
 				bif->if_singlehomed_conf = val;
@@ -1980,15 +1969,17 @@ static int32_t opt_purge ( uint8_t cmd, uint8_t _save, struct opt_type *opt, str
 
 static int32_t opt_seqno ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn ) {
 	
+	struct list_head *list_pos;
+	
 	if ( cmd == OPT_REGISTER ) {
 		
 		my_seqno = rand_num( MAX_SEQNO );
 		
 	} else if ( cmd == OPT_APPLY ) {
 		
-        OLForEach(batman_if, struct batman_if, if_list) {
-            batman_if->if_seqno = my_seqno;
-        }
+		list_for_each( list_pos, &if_list )
+			(list_entry( list_pos, struct batman_if, list ))->if_seqno = my_seqno;
+		
 	}
 	
 	return SUCCESS;
@@ -2001,11 +1992,6 @@ static int32_t opt_if_soft ( uint8_t cmd, uint8_t _save, struct opt_type *opt, s
 		if_conf_soft_changed = YES;
 	
 	return SUCCESS;
-}
-
-static int32_t opt_meshNetworkId ( uint8_t cmd, uint8_t _save, struct opt_type *opt, struct opt_parent *patch, struct ctrl_node *cn ) {
-
-    return SUCCESS;
 }
 
 #ifdef WITHUNUSED
@@ -2046,10 +2032,7 @@ static struct opt_type originator_options[]=
 		
 	{ODI,5,0,ARG_ORIGINATORS,	0,  A_PS0,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0, 		opt_show_origs,
 			0,		"show originators\n"},
-
-    {ODI,5,0,ARG_NETWORKS,	0,  A_PS0,A_USR,A_DYN,A_ARG,A_ANY,	0,		0, 		0,		0, 		opt_show_networks,
-        0,		"show networks\n"},
-
+		
 	{ODI,5,0,ARG_DEV,		0,  A_PMN,A_ADM,A_DYI,A_CFA,A_ANY,	0,		0, 		0,		0, 		opt_dev,
 			"<interface-name>", "add or change device or its configuration, options for specified device are:"},
 
@@ -2123,12 +2106,6 @@ static struct opt_type originator_options[]=
 	{ODI,5,0,"asocial_device",	0,  A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&Asocial_device,MIN_ASOCIAL,	MAX_ASOCIAL,	DEF_ASOCIAL,	0,
 			ARG_VALUE_FORM,	"disable/enable asocial mode for devices unwilling to forward other nodes' traffic"},
 
-	{ODI,5,0,"meshNetworkId",	0,  A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&meshNetworkId,MIN_MESH_NET_ID,	MAX_MESH_NET_ID, DEF_MESH_NET_ID,	opt_meshNetworkId,
-			ARG_VALUE_FORM,	"assignes a mesh network id. if == 0 bmxd protocol version is V10. > 0 protocol version is V11"},
-
-    {ODI,5,0,"meshNetworkIdPreferred",	0,  A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&meshNetworkIdPreferred,MIN_MESH_NET_ID,	MAX_MESH_NET_ID, DEF_MESH_NET_ID,	opt_meshNetworkId,
-        ARG_VALUE_FORM,	"defines preferred mesh network id to use."},
-
 	{ODI,5,0,ARG_WL_CLONES,		0,  A_PS1,A_ADM,A_DYI,A_CFA,A_ANY,	&wl_clones,	MIN_WL_CLONES,	MAX_WL_CLONES,	DEF_WL_CLONES,	opt_if_soft,
 			ARG_VALUE_FORM,	"broadcast OGMs per ogm-interval for wireless devices with\n"
 			"	given probability [%] (eg 200% will broadcast the same OGM twice)"},
@@ -2164,7 +2141,6 @@ static struct opt_type originator_options[]=
 
 void init_originator( void ) {
 	
-    OLInitializeListHead(&if_list);
 	register_options_array( originator_options, sizeof( originator_options ) );
 	
 }

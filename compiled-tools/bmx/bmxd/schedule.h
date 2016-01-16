@@ -21,7 +21,7 @@
 #define DEF_OGI 1000
 #define MIN_OGI 50
 #define MAX_OGI 100000
-extern int32_t my_ogi; // my originator interval in ms
+extern int32_t my_ogi; // my originator interval
 
 #define ARG_OGI_PWRSAVE "ogi_power_save"
 

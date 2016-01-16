@@ -34,7 +34,6 @@
 #include "metrics.h"
 #include "plugin.h"
 #include "schedule.h"
-#include "netid.h"
 
 int32_t my_ogi;   /* orginator message interval in miliseconds */
 int32_t ogi_pwrsave;
@@ -50,8 +49,8 @@ static int32_t sim_paranoia = DEF_SIM_PARA;
 #endif
 
 
-static LIST_ENTRY send_list;
-static LIST_ENTRY task_list;
+static SIMPEL_LIST( send_list );
+static SIMPEL_LIST( task_list );
 
 static int32_t receive_max_sock = 0;
 static fd_set receive_wait_set;
@@ -89,7 +88,9 @@ static void check_selects( void ) {
 	
 	FD_SET(unix_sock,  &receive_wait_set);
 	
-	OLForEach(cn, struct ctrl_node, ctrl_list) {
+	list_for_each( list_pos, &ctrl_list ) {
+		
+		struct ctrl_node *cn = list_entry( list_pos, struct ctrl_node, list );
 		
 		if ( cn->fd > 0  &&  cn->fd != STDOUT_FILENO ) {
 			
@@ -99,7 +100,10 @@ static void check_selects( void ) {
 		}
 	}
 	
-    OLForEach(bif, struct batman_if, if_list) {
+	
+	list_for_each(list_pos, &if_list) {
+		
+		struct batman_if *bif = list_entry(list_pos, struct batman_if, list);
 		
 		if ( bif->if_active  &&  bif->if_linklayer != VAL_DEV_LL_LO ) {
 			
@@ -139,41 +143,61 @@ static void check_selects( void ) {
 
 void register_task( uint32_t timeout, void (* task) (void *), void *data ) {
 	
+	struct list_head *list_pos;
 	
 	//TODO: allocating and freeing tn and tn->data may be much faster when done by registerig function.. 
 	struct task_node *tn = debugMalloc( sizeof( struct task_node ), 109 );
 	memset( tn, 0, sizeof(struct task_node) );
+	INIT_LIST_HEAD( &tn->list );
 	
 	tn->expire = batman_time + timeout;
 	tn->task = task;
 	tn->data = data;
 	
-    int inserted = 0;
-    OLForEach(tmp_tn, struct task_node, task_list) {
+	
+	struct list_head *prev_list_head = (struct list_head *)&task_list;
+	struct task_node *tmp_tn = NULL;
+	
+	list_for_each( list_pos, &task_list ) {
 
-        if ( GREAT_U32(tmp_tn->expire, tn->expire) ) {
-            OLInsertTailList((PLIST_ENTRY)tmp_tn, (PLIST_ENTRY)tn);
-            inserted = 1;
+		tmp_tn = list_entry( list_pos, struct task_node, list );
+
+		if ( GREAT_U32(tmp_tn->expire, tn->expire) ) {
+
+			list_add_before( prev_list_head, list_pos, &tn->list );
 			break;
+
 		}
+
+		prev_list_head = &tmp_tn->list;
+
 	}
 
-    if ( !inserted )
-         OLInsertTailList(&task_list, (PLIST_ENTRY)tn);
+	if ( ( tmp_tn == NULL ) || ( LSEQ_U32(tmp_tn->expire, tn->expire) ) )
+		list_add_tail( &tn->list, &task_list );
 	
 }
 
 void remove_task( void (* task) (void *), void *data ) {
 	
-    OLForEach(tn, struct task_node, task_list) {
+	struct list_head *list_pos, *tmp_pos, *prev_pos = (struct list_head*)&task_list;
+		
+	list_for_each_safe( list_pos, tmp_pos, &task_list ) {
+			
+		struct task_node *tn = list_entry( list_pos, struct task_node, list );
 			
 		if ( tn->task == task && tn->data == data  ) {
-            LIST_ENTRY *prev = OLGetPrev(tn);
-            OLRemoveEntryList((PLIST_ENTRY)tn);
+			
+			list_del( prev_pos, list_pos, &task_list );
+			
 			if ( tn->data )
 				debugFree( tn->data, 1109 );
+			
 			debugFree( tn, 1109 );
-            tn = (struct task_node*) prev;
+			
+		} else {
+			
+			prev_pos = &tn->list;
 		}
 	}
 }
@@ -181,13 +205,17 @@ void remove_task( void (* task) (void *), void *data ) {
 
 uint32_t whats_next( void ) {
 	
-    paranoia( -500175, sim_paranoia );
+	struct list_head *list_pos, *tmp_pos, *prev_pos = (struct list_head*)&task_list;
 
-    OLForEach(tn, struct task_node, task_list) {
+        paranoia( -500175, sim_paranoia );
+
+	list_for_each_safe( list_pos, tmp_pos, &task_list ) {
+			
+		struct task_node *tn = list_entry( list_pos, struct task_node, list );
 			
 		if ( LSEQ_U32( tn->expire, batman_time )  ) {
 			
-            OLRemoveEntryList((PLIST_ENTRY)tn);
+			list_del( prev_pos, list_pos, &task_list );
 			
 			(*(tn->task)) (tn->data);
 			
@@ -212,40 +240,29 @@ static void send_aggregated_ogms( void ) {
 	
 	prof_start( PROF_send_aggregated_ogms );
 
+	struct list_head *if_pos;
 	uint8_t iftype;
 
 	/* send all the aggregated packets (which fit into max packet size) */
-
+	
 	/* broadcast via lan interfaces first */
 	for ( iftype = VAL_DEV_LL_LAN; iftype <= VAL_DEV_LL_WLAN; iftype++ ) {
 
-                OLForEach(bif, struct batman_if, if_list) {
+                list_for_each(if_pos, &if_list) {
+
+                        struct batman_if *bif = list_entry(if_pos, struct batman_if, list);
 
                         dbgf_all(DBGT_INFO, "dev: %s, linklayer %d iftype %d len %d min_len %d...",
                                 bif->dev, bif->if_linklayer, iftype, bif->aggregation_len,
-                                BAT_HEADER_SIZE);
+                                (int32_t)sizeof ( struct bat_header));
 
                         if (bif->if_linklayer == iftype &&
-                                bif->aggregation_len > (int16_t) BAT_HEADER_SIZE) {
+                                bif->aggregation_len > (int32_t)sizeof ( struct bat_header)) {
 
-                                if(GET_MESH_NET_ID(meshNetworkIdSelected) == DEF_MESH_NET_ID)
-                                {
-                                    struct bat_header *bat_hdr = (struct bat_header *) bif->aggregation_out;
-                                    bat_hdr->version = COMPAT_VERSION;
-                                    bat_hdr->link_flags = 0;
-                                    bat_hdr->size = (bif->aggregation_len) / 4;
-                                }
-                                else
-                                {
-                                    struct bat_header_netid *bat_hdr = (struct bat_header_netid *) bif->aggregation_out;
-                                    bat_hdr->version = COMPAT_VERSION_NETID;
-                                    bat_hdr->link_flags = 0;
-                                    bat_hdr->size = (bif->aggregation_len) / 4;
-                                    meshNetworkIdSelected = netid_decrement(meshNetworkIdSelected, meshNetworkId);
-                                    bat_hdr->meshNetworkId = htonl(meshNetworkIdSelected);
-                                }
-
-
+                                struct bat_header *bat_hdr = (struct bat_header *) bif->aggregation_out;
+                                bat_hdr->version = COMPAT_VERSION;
+                                bat_hdr->link_flags = 0;
+                                bat_hdr->size = (bif->aggregation_len) / 4;
 
                                 if (bif->aggregation_len > MAX_UDPD_SIZE || (bif->aggregation_len) % 4 != 0) {
 
@@ -262,7 +279,7 @@ static void send_aggregated_ogms( void ) {
                                                 bif->dev, bif->if_ip_str, bif->if_unicast_sock);
                                 }
 
-                                bif->aggregation_len = BAT_HEADER_SIZE;
+                                bif->aggregation_len = sizeof ( struct bat_header);
 
                         }
  
@@ -275,11 +292,14 @@ static void send_aggregated_ogms( void ) {
 
 void debug_send_list( struct ctrl_node *cn ) {
 	
+	struct list_head *list_pos;
 	//char str[ADDR_STR_LEN];
 	
 	dbg_printf( cn, "Outstanding OGM for sending: \n" );
 
-    OLForEach(send_node, struct send_node, send_list) {
+	list_for_each( list_pos, &send_list ) {
+		
+		struct send_node *send_node = list_entry( list_pos, struct send_node, list );
 		struct bat_packet_ogm *ogm = send_node->ogm;
 		
         dbg_printf( cn, "%-15s   (seqno %5d  ttl %3d)  at %llu (if_seqno=%d) to iff %s\n",
@@ -346,27 +366,39 @@ static void recv_ifevent_netlink_sk( void ) {
 
 
 void remove_outstanding_ogms( struct batman_if *bif ) {
+	struct send_node *send_node;
+	struct list_head *send_pos, *send_temp, *send_prev;
 	
 	if ( !bif )
 		return;
 	
+	send_prev = (struct list_head *)&send_list;
 	
-    OLForEach(send_node, struct send_node, send_list) {
+	list_for_each_safe( send_pos, send_temp, &send_list ) {
+		
+		send_node = list_entry( send_pos, struct send_node, list );
+		
 		if ( send_node->if_outgoing  ==  bif ) {
-            LIST_ENTRY *prev = OLGetPrev(send_node);
-            OLRemoveEntryList((PLIST_ENTRY)send_node);
-            debugFree(send_node, 1502);
-            send_node = (struct send_node*) prev;
-        }
+			
+			list_del( send_prev, send_pos, &send_list );
+                        debugFree(send_node, 1502);
+			
+		} else {
+                        send_prev = send_pos;
+			
+		}
 	}
 }
 	
 static void aggregate_outstanding_ogms( void *unused ) {
 
 	prof_start( PROF_send_outstanding_ogms );
+	struct send_node *send_node;
+	struct list_head *send_pos, *if_pos, *send_temp, *prev_list_head;
 
+	struct batman_if *bif;
 	uint8_t directlink, unidirectional, cloned, ttl, if_singlehomed;
-	int16_t aggregated_size = BAT_HEADER_SIZE;
+	int16_t aggregated_size = sizeof( struct bat_header );
 	
 	int dbg_if_out = 0;
 #define	MAX_DBG_IF_SIZE 200
@@ -374,26 +406,23 @@ static void aggregate_outstanding_ogms( void *unused ) {
 
         // ensuring that aggreg_interval is really an upper boundary
 	register_task( aggr_interval - 1 - rand_num( aggr_interval/10 ), aggregate_outstanding_ogms, NULL );
+	
+	prev_list_head = (struct list_head *)&send_list;
+	
+	list_for_each_safe( send_pos, send_temp, &send_list ) {
+	
+		send_node = list_entry( send_pos, struct send_node, list );
 
-    //overwrite meshNetworkIdSelected if meshNetworkId was set at command line
-    //do this here to ensure that the correct BAT_HEADER_SIZE is checked against.
-    //It might be possible that bif->aggregation_len was set when meshNetworkIdSelected was set to zero
-    //has changed in meantime.
-    meshNetworkIdSelected = netid_getSelectedMeshNetworkId(meshNetworkIdSelected, meshNetworkId, meshNetworkIdPreferred);
-    //need to set to correct size
-    aggregated_size = BAT_HEADER_SIZE;
-
-    OLForEach(send_node, struct send_node, send_list) {
 		
 		if ( GREAT_U32( send_node->send_time, batman_time ) )
 			break; // for now we are done, 
 			
-		if ( aggregated_size > (int16_t)BAT_HEADER_SIZE  &&
+		if ( aggregated_size > (int32_t)sizeof(struct bat_header)  &&  
 		     aggregated_size + send_node->ogm_buff_len  >  pref_udpd_size  ) 
 		{
 			dbgf_all( DBGT_INFO, "max aggregated size %d", aggregated_size );
 			send_aggregated_ogms();
-			aggregated_size = BAT_HEADER_SIZE;
+			aggregated_size = sizeof( struct bat_header );
 		}
 	
 		send_node->iteration++;	
@@ -404,7 +433,7 @@ static void aggregate_outstanding_ogms( void *unused ) {
 		     (aggregated_size + send_node->ogm_buff_len  >  pref_udpd_size  &&  send_node->own_if) ) 
 		{
 		
-			if (  aggregated_size <= (int16_t)BAT_HEADER_SIZE ) {
+			if (  aggregated_size <= (int32_t)sizeof( struct bat_header ) ) {
 				
 				dbg_mute( 30, DBGL_SYS, DBGT_ERR,
 				          "Drop OGM, single packet (own=%d) to large to fit legal packet size"
@@ -495,9 +524,12 @@ static void aggregate_outstanding_ogms( void *unused ) {
 				
 			/* (re-) broadcast to propagate existence of path to OG*/
 			} else if ( !unidirectional && ttl > 0 ) {
-								struct bat_packet_ogm *ogm;
+	
+				list_for_each(if_pos, &if_list) {
 
-                OLForEach(bif, struct batman_if, if_list) {
+					struct bat_packet_ogm *ogm;
+
+                                        bif = list_entry(if_pos, struct batman_if, list);
 
 					if ( !bif->if_active )
 						continue;
@@ -573,16 +605,19 @@ static void aggregate_outstanding_ogms( void *unused ) {
 		
 		// remove all the finished packets from send_list
 		if ( send_node_done ) {
-            LIST_ENTRY *prev = OLGetPrev(send_node);
-            OLRemoveEntryList((PLIST_ENTRY)send_node);
-            debugFree(send_node, 1502);
-            send_node = (struct send_node*) prev;
+	
+			list_del( prev_list_head, send_pos, &send_list );
+                        debugFree(send_node, 1502);
+		
+		} else {
+		
+			prev_list_head = &send_node->list;	
 		}
 		
 	}
 	
 	
-	if ( aggregated_size > (int16_t)BAT_HEADER_SIZE ) {
+	if ( aggregated_size > (int32_t)sizeof( struct bat_header ) ) {
 	
 		send_aggregated_ogms();
 		
@@ -590,12 +625,15 @@ static void aggregate_outstanding_ogms( void *unused ) {
 	
 	}
 	
-    OLForEach(bif, struct batman_if, if_list) {
+	
+	list_for_each(if_pos, &if_list) {
+			
+		bif = list_entry(if_pos, struct batman_if, list);
 
-		if ( bif->aggregation_len != (int16_t)BAT_HEADER_SIZE ) {
+		if ( bif->aggregation_len != sizeof( struct bat_header ) ) {
 			dbgf( DBGL_SYS, DBGT_ERR, 
 			     "finished with dev %s and packet_out_len %d > %d",
-			bif->dev, bif->aggregation_len, (int)BAT_HEADER_SIZE );
+			     bif->dev, bif->aggregation_len, (int)sizeof( struct bat_header ) );
 		}
 
 
@@ -627,6 +665,9 @@ static void aggregate_outstanding_ogms( void *unused ) {
 void schedule_rcvd_ogm( uint16_t oCtx, uint16_t neigh_id, struct msg_buff *mb ) {
 
 	prof_start( PROF_schedule_rcvd_ogm );
+	
+	struct send_node *send_packet_tmp = NULL;
+	struct list_head *list_pos, *prev_list_head;
 	
 	uint8_t with_unidirectional_flag = 0;
 	uint8_t directlink = 0;
@@ -701,6 +742,7 @@ void schedule_rcvd_ogm( uint16_t oCtx, uint16_t neigh_id, struct msg_buff *mb ) 
 
 	struct send_node *sn = debugMalloc( sizeof(struct send_node) + sizeof(struct bat_packet_ogm) + snd_ext_total_len, 504 );
 	memset( sn, 0, sizeof( struct send_node ) );
+	INIT_LIST_HEAD( &sn->list );
 
 	sn->ogm_buff_len = sizeof(struct bat_packet_ogm) + snd_ext_total_len;
         sn->ogm = (struct bat_packet_ogm*)sn->_attached_ogm_buff;
@@ -751,20 +793,28 @@ void schedule_rcvd_ogm( uint16_t oCtx, uint16_t neigh_id, struct msg_buff *mb ) 
 
 	
 	/* change sequence number to network order */
-    sn->ogm->ogm_seqno = htons(sn->ogm->ogm_seqno);
+        sn->ogm->ogm_seqno = htons(sn->ogm->ogm_seqno);
+	
 
-    int inserted = 0;
-    OLForEach(send_packet_tmp, struct send_node, send_list) {
+	prev_list_head = (struct list_head *)&send_list;
+
+	list_for_each( list_pos, &send_list ) {
+
+		send_packet_tmp = list_entry( list_pos, struct send_node, list );
 
 		if ( GREAT_U32(send_packet_tmp->send_time, sn->send_time) ) {
-            OLInsertTailList((PLIST_ENTRY) send_packet_tmp, (PLIST_ENTRY) sn);
-            inserted = 1;
+
+			list_add_before( prev_list_head, list_pos, &sn->list );
 			break;
+
 		}
+
+		prev_list_head = &send_packet_tmp->list;
+
 	}
 
-    if ( ! inserted )
-        OLInsertTailList(&send_list, (PLIST_ENTRY)sn);
+	if ( ( send_packet_tmp == NULL ) || ( LSEQ_U32(send_packet_tmp->send_time, sn->send_time) ) )
+		list_add_tail( &sn->list, &send_list );
 
 		
 	prof_stop( PROF_schedule_rcvd_ogm );
@@ -927,14 +977,9 @@ static void process_packet( struct msg_buff *mb, unsigned char *pos, uint32_t rc
 
 	int32_t check_len, check_done, udp_len;
 	unsigned char *check_pos;
-
-    //overwrite meshNetworkIdSelected if meshNetworkId was set at command line. needed
-    //to set BAT_HEADER_SIZE and COMPAT_VERSION_X correctly
-    meshNetworkIdSelected = netid_getSelectedMeshNetworkId(meshNetworkIdSelected, meshNetworkId, meshNetworkIdPreferred);
-
-    //incommming must be at least bat_header or bat_header_netid. current bmxd is either accepting compat_version 10 or 11 (with meshNetworkIdSelected)
-	//but does never understand both compat-versions (bat_header) to avoid connection from different networks.
-	if ( mb->total_length < (int16_t)(BAT_HEADER_SIZE + sizeof(struct bat_packet_common)) ) {
+	
+	
+	if ( mb->total_length < (int32_t)(sizeof(struct bat_header) + sizeof(struct bat_packet_common)) ) {
 		dbg_mute( 35, DBGL_SYS, DBGT_ERR, "Invalid packet length from %s, len %d", 
 		          ipStr(rcvd_neighbor), mb->total_length);
 
@@ -953,99 +998,49 @@ static void process_packet( struct msg_buff *mb, unsigned char *pos, uint32_t rc
 
 	addr_to_str( rcvd_neighbor, mb->neigh_str );
 	
-    //stephan:check that we got at least BAT_HEADER_SIZE_COMPAT_VERSION bytes
-    if ( mb->total_length < (int16_t)(BAT_HEADER_SIZE_COMPAT_VERSION) ) {
-        dbg_mute( 40, DBGL_SYS, DBGT_ERR, "Drop packet: Rcvd to small packet via NB %s, rcvd udp_len %i",
-             mb->neigh_str, mb->total_length );
+	
+	// immediately drop invalid packets...
+	// we acceppt longer packets than specified by pos->size to allow padding for equal packet sizes
+	if ( 	((((struct bat_header *)pos)->size)<<2) < (int32_t)(sizeof(struct bat_header) + sizeof(struct bat_packet_common)) ||
+		(((struct bat_header *)pos)->version) != COMPAT_VERSION  ||
+		((((struct bat_header *)pos)->size)<<2) > mb->total_length )
+	{
+	
+		if ( mb->total_length >= (int32_t)(sizeof(struct bat_header) /*+ sizeof(struct bat_packet_common) */) ) {
+			dbg_mute( 60, DBGL_SYS, DBGT_WARN, 
+			     "Drop packet: rcvd incompatible batman packet via NB %s "
+			     "(version? %i, reserved? %X, size? %i), "
+			     "rcvd udp_len %d  My version is %d",
+			     mb->neigh_str,
+			     ((struct bat_header *)pos)->version,
+			     ((struct bat_header *)pos)->reserved,
+			     ((struct bat_header *)pos)->size,
+			     mb->total_length, COMPAT_VERSION );
 
-        prof_stop( PROF_process_packet );
-        return;
-    }
+                } else {
+			dbg_mute( 40, DBGL_SYS, DBGT_ERR, "Rcvd to small packet via NB %s, rcvd udp_len %i",
+			     mb->neigh_str, mb->total_length );
+                }
 
-    //stephan: check if coded size exceeds number of received bytes
-    if(((((struct bat_header *)pos)->size)<<2) > mb->total_length) {
-        dbg_mute( 40, DBGL_SYS, DBGT_ERR, "Drop packet: Rcvd coding size more than received via NB %s, rcvd udp_len %i",
-             mb->neigh_str, mb->total_length );
+		prof_stop( PROF_process_packet );
+		return;
+	
+	}
 
-        prof_stop( PROF_process_packet );
-        return;
-    }
+        mb->neigh = rcvd_neighbor;
 
-    //stephan: check compatibily version
-    if( (((struct bat_header *)pos)->version) != COMPAT_VERSION
-     && (((struct bat_header *)pos)->version) != COMPAT_VERSION_NETID){
-        dbg_mute( 40, DBGL_SYS, DBGT_ERR, "Drop packet: invalid paket version %i received via NB %s, rcvd udp_len %i",
-                  ((struct bat_header *)pos)->version, mb->neigh_str, mb->total_length );
-
-        prof_stop( PROF_process_packet );
-        return;
-    }
-
-
-    //stephan: check if we get minimal packet size
-    if(     (    (((struct bat_header *)pos)->version) == COMPAT_VERSION
-              && ((((struct bat_header *)pos)->size)<<2) < (int16_t)(BAT_HEADER_SIZE_COMPAT_VERSION + sizeof(struct bat_packet_common)))
-         || (    (((struct bat_header *)pos)->version) == COMPAT_VERSION_NETID
-                 && ((((struct bat_header *)pos)->size)<<2) < (int16_t)(BAT_HEADER_SIZE_COMPAT_VERSION_NETID + sizeof(struct bat_packet_common))) )
-    {
-        dbg_mute( 40, DBGL_SYS, DBGT_ERR, "Drop packet: Rcvd size to small via NB %s, rcvd udp_len %i",
-                  mb->neigh_str, mb->total_length );
-        prof_stop( PROF_process_packet );
-        return;
-    }
-
-    uint32_t pkg_meshNetworkId = 0;
-
-    //stephan: now check if we have to auto select new mesh network id.
-    if((((struct bat_header *)pos)->version) == COMPAT_VERSION_NETID)
-    {
-        pkg_meshNetworkId = ntohl(((struct bat_header_netid *)pos)->meshNetworkId);
-        dbgf_all( DBGT_INFO, "version? %i, "
-                 "reserved? %X, size? %i, meshNetworkId %lu meshNetworkTtl %lu, rcvd udp_len %d via NB %s %s %s",
-                 ((struct bat_header_netid *)pos)->version,
-                 ((struct bat_header_netid *)pos)->reserved,
-                 ((struct bat_header_netid *)pos)->size,
-                  GET_MESH_NET_ID(pkg_meshNetworkId), GET_MESH_NET_TTL(pkg_meshNetworkId),
-                 mb->total_length, mb->neigh_str, mb->iif->dev, mb->unicast?"UNICAST":"BRC" );
-
-        //store meshNetworkId for selection process
-        netid_add(pkg_meshNetworkId);
-
-        //use correct length for COMPAT_VERSION_NETID
-        check_len = udp_len = ((((struct bat_header_netid *)pos)->size)<<2) - sizeof( struct bat_header_netid );
-        check_pos = pos = pos + sizeof(struct bat_header_netid);
-    }
-    else
-    {
-        dbgf_all( DBGT_INFO, "version? %i, "
-                 "reserved? %X, size? %i, meshNetworId %lu, rcvd udp_len %d via NB %s %s %s",
-                 ((struct bat_header *)pos)->version,
-                 ((struct bat_header *)pos)->reserved,
-                 ((struct bat_header *)pos)->size,
-                  0,
-                 mb->total_length, mb->neigh_str, mb->iif->dev, mb->unicast?"UNICAST":"BRC" );
+	dbgf_all( DBGT_INFO, "version? %i, "
+	         "reserved? %X, size? %i, rcvd udp_len %d via NB %s %s %s", 
+	         ((struct bat_header *)pos)->version, 
+	         ((struct bat_header *)pos)->reserved,
+	         ((struct bat_header *)pos)->size,
+	         mb->total_length, mb->neigh_str, mb->iif->dev, mb->unicast?"UNICAST":"BRC" );
 
 
-        netid_add(DEF_MESH_NET_ID);
-
-        check_len = udp_len = ((((struct bat_header *)pos)->size)<<2) - sizeof( struct bat_header );
-        check_pos = pos = pos + sizeof(struct bat_header);
-    }
-
-    meshNetworkIdSelected = netid_getSelectedMeshNetworkId(meshNetworkIdSelected, meshNetworkId, meshNetworkIdPreferred);
-
-    // ignore paket if network id does not match. before autoselect we accept pkg_meshNetworkId=0 pakets.
-    // after selecting an id, we only accept those pakets
-    if(GET_MESH_NET_ID(pkg_meshNetworkId) != GET_MESH_NET_ID(meshNetworkIdSelected))
-    {
-        dbgf_all( DBGT_ERR, "invalid meshNetworkId %lu, expected %lu", GET_MESH_NET_ID(pkg_meshNetworkId), GET_MESH_NET_ID(meshNetworkIdSelected));
-        prof_stop( PROF_process_packet );
-        return;
-    }
-
-	mb->neigh = rcvd_neighbor;
-
-
+	check_len = udp_len = ((((struct bat_header *)pos)->size)<<2) - sizeof( struct bat_header );
+	check_pos = pos = pos + sizeof(struct bat_header);
+	
+	
 	// immediately drop non-plausibile packets...
 	check_done = 0;
 
@@ -1210,9 +1205,9 @@ loop4Event:
 		
 		
 		// check for received packets...
-        OLForEach(bif, struct batman_if, if_list) {
+		list_for_each( list_pos, &if_list ) {
 			
-            mb->iif = bif;
+			mb->iif = list_entry( list_pos, struct batman_if, list );
 			
 			if ( mb->iif->if_linklayer == VAL_DEV_LL_LO )
 				continue;
@@ -1374,8 +1369,10 @@ loop4ActivePlugins:
 	
 loop4ActiveClients:
 		// check for all connected control clients...
-	OLForEach(client, struct ctrl_node, ctrl_list) {
+		list_for_each( list_pos, &ctrl_list ) {
 			
+			struct ctrl_node *client = list_entry( list_pos, struct ctrl_node, list );
+				
 			if ( FD_ISSET( client->fd, &tmp_wait_set ) ) {
 					
 				FD_CLR( client->fd, &tmp_wait_set );
@@ -1419,6 +1416,9 @@ void schedule_own_ogm( struct batman_if *bif ) {
 
 	prof_start( PROF_schedule_own_ogm );
 
+	struct send_node *send_packet_tmp = NULL;
+	struct list_head *list_pos, *prev_list_head;
+
         int sn_size = sizeof (struct send_node) +
                 ((bif == primary_if) ? MAX_UDPD_SIZE + 1 : sizeof (struct bat_packet_ogm) + sizeof (struct ext_packet));
 
@@ -1426,13 +1426,15 @@ void schedule_own_ogm( struct batman_if *bif ) {
 
         memset(sn, 0, sizeof (struct send_node) + sizeof (struct bat_packet_ogm) );
 
+        INIT_LIST_HEAD( &sn->list );
+
         sn->ogm = (struct bat_packet_ogm*) sn->_attached_ogm_buff;
 
         sn->ogm->ext_msg = NO;
         sn->ogm->bat_type = BAT_TYPE_OGM;
         sn->ogm->ogx_flag = NO;
         sn->ogm->ogm_ttl = bif->if_ttl;
-        sn->ogm->ogm_pws = my_pws;
+	sn->ogm->ogm_pws = my_pws;
         sn->ogm->orig = bif->if_addr;
 	//sn->ogm->ogm_path_lounge = Signal_lounge;
 
@@ -1507,20 +1509,26 @@ void schedule_own_ogm( struct batman_if *bif ) {
 
 	sn->ogm->ogm_misc = MIN( s_curr_avg_cpu_load , 255 );
 	
-    int inserted = 0;
-    OLForEach(send_packet_tmp, struct send_node, send_list) {
+	prev_list_head = (struct list_head *)&send_list;
+
+	list_for_each( list_pos, &send_list ) {
+
+		send_packet_tmp = list_entry( list_pos, struct send_node, list );
 
 		if ( GREAT_U32(send_packet_tmp->send_time, sn->send_time) ) {
-            OLInsertTailList((PLIST_ENTRY) send_packet_tmp, (PLIST_ENTRY) sn);
-            inserted = 1;
+
+			list_add_before( prev_list_head, list_pos, &sn->list );
 			break;
+
 		}
+
+		prev_list_head = &send_packet_tmp->list;
+
 	}
 
-    if ( !inserted )
-        OLInsertTailList(&send_list, (PLIST_ENTRY) sn);
+	if ( ( send_packet_tmp == NULL ) || ( LSEQ_U32(send_packet_tmp->send_time, sn->send_time) ) )
+		list_add_tail( &sn->list, &send_list );
 
-    struct list_head * list_pos;
 	list_for_each( list_pos, &link_list ) {
 
 		struct link_node *ln = list_entry(list_pos, struct link_node, list);
@@ -1571,9 +1579,6 @@ static struct opt_type schedule_options[]=
 
 void init_schedule( void ) {
 	
-    OLInitializeListHead(&send_list);
-    OLInitializeListHead(&task_list);
-
 	memset( &my_pip_extension_packet, 0, sizeof(struct ext_packet) );
 	my_pip_extension_packet.EXT_FIELD_MSG = YES;
 	my_pip_extension_packet.EXT_FIELD_TYPE = EXT_TYPE_64B_PIP;
@@ -1593,16 +1598,28 @@ void start_schedule( void ) {
 
 void cleanup_schedule( void ) {
 	
-    for(struct send_node * sn = (struct send_node *)OLGetNext(&send_list);!OLIsListEmpty(&send_list); sn = (struct send_node *)OLGetNext(&send_list)) {
-       OLRemoveEntryList((PLIST_ENTRY) sn);
-       debugFree(sn, 1106);
-	}
+	struct list_head *list_pos_tmp, *list_pos;
+	
+	list_for_each_safe( list_pos, list_pos_tmp, &send_list ) {
+		
+		struct send_node *send_node = list_entry( list_pos, struct send_node, list );
+		
+		list_del( (struct list_head *)&send_list, list_pos, &send_list );
 
-    for(struct task_node* tn = (struct task_node *)OLGetNext(&task_list);!OLIsListEmpty(&task_list); tn = (struct task_node *)OLGetNext(&task_list)) {
-        OLRemoveEntryList((PLIST_ENTRY) tn);
-        if ( tn->data )
-            debugFree( tn->data, 1109 );
-        debugFree( tn, 1109 );
+                debugFree(send_node, 1106);
+		
+	}
+	
+	list_for_each_safe( list_pos, list_pos_tmp, &task_list ) {
+		
+		struct task_node *tn = list_entry( list_pos, struct task_node, list );
+		
+		list_del( (struct list_head *)&task_list, list_pos, &task_list );
+		
+		if ( tn->data )
+			debugFree( tn->data, 1109 );
+		
+		debugFree( tn, 1109 );
 	}
 	
 	close_ifevent_netlink_sk();	

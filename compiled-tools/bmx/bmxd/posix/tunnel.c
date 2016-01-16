@@ -119,14 +119,7 @@ static uint32_t pref_gateway = 0;
 #define IP_LEASE_TIMEOUT          (1 * ONE_MINUTE)
 
 #define MAX_TUNNEL_IP_REQUESTS 60 //12
-
-//SE: timeout wurde von 1000 auf 5000 erhoeht. dieser wert wird als Schutz vor ueberflutung
-//mit tunnel ip requets definert und ist die minimale zeit zwischen neuen tunnel ip requests.
-//das ist notwendig wenn die erste anfrage gestellt wird, da ein reply vom gateway server langer
-//dauern kann und bis dahin die aktuelle lease time und lease dauer noch 0 ist. 
-//bei ganz viel nutzern (schnorrstrasse dresden), die gleichzeitig eine anfrage mache, fuert das
-//zu ganz vielen anfragen.
-#define TUNNEL_IP_REQUEST_TIMEOUT 5000 // msec
+#define TUNNEL_IP_REQUEST_TIMEOUT 1000 // msec
 
 
 #define DEF_TUN_PERSIST 1
@@ -159,7 +152,6 @@ struct tun_packet_start {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned int type:4;
 	unsigned int version:4;  // should be the first field in the packet in network byte order
-                             //version is the compat version of batman header
 #elif __BYTE_ORDER == __BIG_ENDIAN
 	unsigned int version:4;
 	unsigned int type:4;
@@ -168,18 +160,13 @@ struct tun_packet_start {
 #endif
 } __attribute__((packed));
 
-
-//Tunnel paket enthaelt nur die compatibilty version aber nicht die netid selber.
-//das ist nicht notwendig, da keine route existiert wenn netid nicht zu diesem knoten passt
-//MTU ist somit nicht abhaengig von netid
 struct tun_packet
 {
 	uint8_t  reserved1;
 	uint8_t  reserved2;
 	uint8_t  reserved3;
 
-    struct tun_packet_start start;  //at address of this struct the complete incomming udp paket is copied
-                                    //all bytes following are interpreted as union tt depending on paket type
+	struct tun_packet_start start;
 #define TP_TYPE  start.type
 #define TP_VERS  start.version
 
@@ -217,9 +204,9 @@ struct gwc_args {
 	int32_t tun_fd;
 	int32_t tun_ifi;
 	char tun_dev[IFNAMSIZ];		// was tun_if
-	batman_time_t tun_ip_request_stamp;
-	batman_time_t tun_ip_lease_stamp;
-	batman_time_t tun_ip_lease_duration;
+    batman_time_t tun_ip_request_stamp;
+    batman_time_t tun_ip_lease_stamp;
+    batman_time_t tun_ip_lease_duration;
 	uint32_t send_tun_ip_requests;
 	uint32_t pref_addr;
 	//	uint32_t last_invalidip_warning;
@@ -792,7 +779,7 @@ static void gwc_request_tun_ip( struct tun_packet *tp ) {
 		      ipStr(gwc_args->gw_addr.sin_addr.s_addr), ipStr(gwc_args->pref_addr) );
 	
 	memset( &tp->tt, 0, sizeof(tp->tt) );
-	tp->TP_VERS = COMPAT_VERSION_X;
+	tp->TP_VERS = COMPAT_VERSION;
 	tp->TP_TYPE = TUNNEL_IP_REQUEST;
 	tp->LEASE_IP = gwc_args->pref_addr;
 	
@@ -914,7 +901,7 @@ static void gwc_recv_tun( int32_t fd_in ) {
 			
 		}
 		
-		tp.TP_VERS = COMPAT_VERSION_X;
+		tp.TP_VERS = COMPAT_VERSION;
 		tp.TP_TYPE = TUNNEL_DATA;
 
 		iphdr = (struct iphdr *)(tp.IP_PACKET);
@@ -1019,7 +1006,7 @@ void gwc_recv_udp( int32_t fd_in ) {
 			
 		}
 
-		if ( tp.TP_VERS != COMPAT_VERSION_X ) {
+		if ( tp.TP_VERS != COMPAT_VERSION ) {
 			
 			dbgf( DBGL_SYS, DBGT_ERR, 
 			     "Invalid compat version (%d) via tunnel, from %s !", 
@@ -1482,7 +1469,7 @@ static void gws_recv_udp( int32_t fd_in ) {
 			
 		}
 
-		if ( tp.TP_VERS != COMPAT_VERSION_X ) {
+		if ( tp.TP_VERS != COMPAT_VERSION ) {
 			
 			dbgf( DBGL_SYS, DBGT_ERR, "Invalid compat version (%d) via tunnel, from %s", 
 				      tp.TP_VERS, ipStr(addr.sin_addr.s_addr) );
@@ -1527,7 +1514,7 @@ static void gws_recv_udp( int32_t fd_in ) {
 								    gws_args->gw_client_list[ iph_addr_suffix_h ]->addr == addr.sin_addr.s_addr) ) {
 						
 					memset( &tp.tt.trt, 0, sizeof(tp.tt.trt));
-					tp.TP_VERS = COMPAT_VERSION_X;
+					tp.TP_VERS = COMPAT_VERSION;
 					tp.TP_TYPE = TUNNEL_IP_INVALID;
 					
 					dbg( DBGL_SYS, DBGT_ERR, "got packet from unknown client: %s (virtual ip %s)", 
@@ -1553,7 +1540,7 @@ static void gws_recv_udp( int32_t fd_in ) {
 			else
 				tp.LEASE_LT = 0;
 			
-			tp.TP_VERS = COMPAT_VERSION_X;
+			tp.TP_VERS = COMPAT_VERSION;
 
 			tp.TP_TYPE = TUNNEL_IP_REPLY;
 			
@@ -1616,7 +1603,7 @@ static void gws_recv_tun( int32_t fd_in ) {
 		
 		gws_args->client_addr.sin_addr.s_addr = gws_args->gw_client_list[ iph_addr_suffix_h ]->addr;
 
-		tp.TP_VERS = COMPAT_VERSION_X;
+		tp.TP_VERS = COMPAT_VERSION;
 		
 		tp.TP_TYPE = TUNNEL_DATA;
 

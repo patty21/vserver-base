@@ -18,13 +18,11 @@
 
 REVISION =	"$(shell git show --abbrev-commit | sed -n '1{s/.* //p}')"
 DATE=		"$(shell git show --abbrev-commit | sed -n '3{s/Date:[ ]\+\(.*\) +.*/\1/p}' )"
-REVISION_VERSION =\"\ git:[$(REVISION):$(DATE)]\"
+REVISION_VERSION =\"-git:[$(REVISION):$(DATE)]\"
 
 
-CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -g3 -std=gnu99 -I./
+CFLAGS += -pedantic -Wall -W -Wno-unused-parameter -Os -g3 -std=gnu99 -I./
 CFLAGS += -DREVISION_VERSION=$(REVISION_VERSION)
-CFLAGS += -Os
-#CFLAGS += -O0
 #CFLAGS += -DDEBUG_MALLOC -DMEMORY_USAGE
 
 #EXTRA_CFLAGS += -DTESTDEBUG
@@ -78,8 +76,8 @@ LOG_BRANCH= trunk/batman-experimental
 
 SRC_FILES= "\(\.c\)\|\(\.h\)\|\(Makefile\)\|\(INSTALL\)\|\(LIESMICH\)\|\(README\)\|\(THANKS\)\|\(./posix\)\|\(./linux\)\|\(./man\)\|\(./doc\)"
 
-SRC_C= objlist.c netid.c batman.c originator.c hna.c schedule.c plugin.c list-batman.c allocate.c avl.c profile.c control.c metrics.c $(OS_C)
-SRC_H= objlist.h netid.h batman.h originator.h hna.h schedule.h plugin.h list-batman.h allocate.h avl.h profile.h control.h metrics.h vis-types.h os.h
+SRC_C= batman.c originator.c hna.c schedule.c plugin.c list-batman.c allocate.c avl.c profile.c control.c metrics.c $(OS_C)
+SRC_H= batman.h originator.h hna.h schedule.h plugin.h list-batman.h allocate.h avl.h profile.h control.h metrics.h vis-types.h os.h
 OBJS=  $(SRC_C:.c=.o)
 
 #PACKAGE_NAME=	batmand-exp

@@ -994,9 +994,12 @@ static char *get_ip4conf_buffer ( struct ifconf *ifc ) {
 
 static int is_batman_if( char *dev, struct batman_if **bif ) {
 	
-    OLForEach(batman_if, struct batman_if, if_list) {
+	struct list_head *if_pos = NULL;
+	
+	
+	list_for_each( if_pos, &if_list ) {
 		
-        (*bif) = batman_if;
+		(*bif) = list_entry( if_pos, struct batman_if, list );
 		
 		if ( wordsEqual( (*bif)->dev, dev ) )
 			return YES;
@@ -1111,21 +1114,25 @@ static void if_activate( struct batman_if *bif ) {
 
 	if ( if_validate( YES/*set*/, bif, bif->dev, NO/*reduced check*/ ) == FAILURE )
 		goto error;
-
+	
 	if ( wordsEqual( "lo", bif->dev_phy ) ) {
+		
 		bif->if_linklayer = VAL_DEV_LL_LO;
 		
 	} else if ( bif->if_linklayer_conf != -1 ) {
-
+		
 		//FIXME: when this parameter is changed only if_reconfigure_soft is called
 		bif->if_linklayer = bif->if_linklayer_conf; 
+		
 	} else /* check if interface is a wireless interface */ {
 		
 		struct ifreq int_req;
 		memset( &int_req, 0, sizeof (struct ifreq) );
 		strncpy( int_req.ifr_name, bif->dev_phy, IFNAMSIZ - 1 );
+		
 		bif->if_linklayer = 
 			(ioctl( rt_sock, SIOCGIWNAME, &int_req ) < 0 ? VAL_DEV_LL_LAN : VAL_DEV_LL_WLAN);
+		
 	}
 	
 	
@@ -1820,6 +1827,7 @@ void if_deactivate( struct batman_if *bif ) {
 
 void check_interfaces() {
 	
+	struct list_head *list_pos;
 	uint8_t cb_conf_hooks = NO;
 	
 	dbgf_all( DBGT_INFO, " " );
@@ -1829,7 +1837,7 @@ void check_interfaces() {
 	//Do we need this? There was an interface attribute which change is not catched by ifevent_sk ??
 	register_task( 5000, check_interfaces, NULL );
 	
-    if ( OLIsListEmpty( &if_list ) ) {
+	if ( list_empty( &if_list ) ) {
 		dbg( DBGL_SYS, DBGT_ERR, "No interfaces specified");
 		cleanup_all( CLEANUP_FAILURE );
 	}
@@ -1837,7 +1845,10 @@ void check_interfaces() {
 	
 	Mtu_min = MAX_MTU;
 	
-    OLForEach(bif, struct batman_if, if_list) {
+	list_for_each(list_pos, &if_list) {
+		
+		struct batman_if *bif = list_entry(list_pos, struct batman_if, list);
+
 		
 		if ((bif->if_active) && (!is_interface_up(bif->dev))) {
 			
@@ -1874,12 +1885,13 @@ void check_interfaces() {
                         bif->if_conf_soft_changed = YES; // to be considered in if_activate()->if_reconfigure_soft()
 		
 		if ( (!bif->if_active)  &&  (is_interface_up(bif->dev)) ) {
-//se: allow enabling interfaces
-#if 0
-						struct batman_if *tmp_bif = NULL;
-            OLForEach(b, struct batman_if, if_list) {
-                tmp_bif = b;
-
+			
+			struct list_head *tmp_pos;
+			struct batman_if *tmp_bif = NULL;
+			list_for_each( tmp_pos, &if_list ) {
+				
+				tmp_bif = list_entry( list_pos, struct batman_if, list );
+				
 				if ( !wordsEqual(tmp_bif->dev, bif->dev)  &&  tmp_bif->if_active  &&  tmp_bif->if_addr == bif->if_addr ) {
 					
 					dbg_mute( 40, DBGL_SYS, DBGT_ERR, "IF %-10s IP %-15s already used for IF %s", 
@@ -1889,9 +1901,7 @@ void check_interfaces() {
 				tmp_bif = NULL;
 			}
 			
-			if ( !tmp_bif )
-#endif //se:
-			{
+			if ( !tmp_bif ) {
 				
 				if ( on_the_fly )
 					dbg_mute( 50, DBGL_SYS, DBGT_INFO, 

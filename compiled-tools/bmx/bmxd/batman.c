@@ -34,7 +34,7 @@
 #include "plugin.h"
 #include "schedule.h"
 //#include "avl.h"
-#include "objlist.h"
+
 
 
 
@@ -68,7 +68,7 @@ int32_t Gateway_class = 0;
 
 //uint8_t Link_flags = 0;
 
-batman_time_t batman_time = 0;//milli seconds
+batman_time_t batman_time = 0;
 batman_time_t batman_time_sec = 0;
 
 uint8_t on_the_fly = NO;
@@ -77,6 +77,8 @@ uint32_t s_curr_avg_cpu_load = 0;
 
 void batman( void ) {
 
+	struct list_head *list_pos;
+	struct batman_if *batman_if;
     batman_time_t regular_timeout, statistic_timeout;
 
     batman_time_t s_last_cpu_time = 0, s_curr_cpu_time = 0;
@@ -104,9 +106,9 @@ void batman( void ) {
 			
 			close_ctrl_node( CTRL_CLEANUP, 0 );
 			
-			OLForEach(pEntry, struct dbgl_node, dbgl_clients[DBGL_ALL])
-			{
-				struct ctrl_node *cn = pEntry->cn;
+			list_for_each( list_pos, &dbgl_clients[DBGL_ALL] ) {
+				
+				struct ctrl_node *cn = (list_entry( list_pos, struct dbgl_node, list ))->cn;
 				
 				dbg_printf( cn, "------------------ DEBUG ------------------ \n" );
 				
@@ -137,7 +139,9 @@ void batman( void ) {
 			check_kernel_config( NULL );
 			
 			// check for changed interface konfigurations...
-            OLForEach(batman_if, struct batman_if, if_list) {
+			list_for_each( list_pos, &if_list ) {
+				
+				batman_if = list_entry( list_pos, struct batman_if, list );
 
 				if ( batman_if->if_active )
 					check_kernel_config( batman_if );
@@ -145,9 +149,9 @@ void batman( void ) {
 			}
 			
 			/* generating cpu load statistics... */
-			s_curr_cpu_time = clock();
+			s_curr_cpu_time = (uint32_t)clock();
 			
-			s_curr_avg_cpu_load = ( (s_curr_cpu_time - s_last_cpu_time) / (batman_time_t)(batman_time - statistic_timeout) );
+            s_curr_avg_cpu_load = ( (s_curr_cpu_time - s_last_cpu_time) / (batman_time_t)(batman_time - statistic_timeout) );
 			
 			s_last_cpu_time = s_curr_cpu_time;
 		
@@ -253,7 +257,9 @@ static void send_vis_packet( void *unused ) {
 	
 	/* secondary interfaces */
 
-    OLForEach(batman_if, struct batman_if, if_list) {
+	list_for_each( list_pos, &if_list ) {
+	
+		batman_if = list_entry( list_pos, struct batman_if, list );
 	
 		if ( ((struct vis_packet *)vis_packet)->sender_ip == batman_if->if_addr )
 			continue;
